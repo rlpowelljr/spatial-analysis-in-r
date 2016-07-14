@@ -9,7 +9,7 @@ My Analysis consists of my efforts to answer the following questions:
 
   1. What is the effect of an airport on a county's unemployment rate?
   
-  2. What is the effect of distance to one of the Top 50 airports in the country as measured on the airport's: 
+  2. How does the traffic of the nearest airport effect unemployment rates?. This is measured on the airport's: 
   
       a. Passenger Movement
   
