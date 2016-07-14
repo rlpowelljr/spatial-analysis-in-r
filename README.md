@@ -9,7 +9,11 @@ My Analysis consists of my efforts to answer the following questions:
 
   1. What is the effect of distance to the nearest airport on a county's unemployment rate?
   
+<<<<<<< HEAD
   2. How does the traffic of the nearest airport affect unemployment rates?. This is measured on the airport's passenger emplanements and cargo movements.
+=======
+  2. How does the traffic of the nearest airport affect unemployment rates?. This is measured on the airport's Passenger embarkments and cargo movement.
+>>>>>>> 1516d9ee278cfe09f0ffe9a64e9f99520338f4d0
     
 ## Data Sources
   1. Airport Traffic: [Federal Aviation Administration (FAA)](http://www.faa.gov/airports/planning_capacity/passenger_allcargo_stats/passenger/)
