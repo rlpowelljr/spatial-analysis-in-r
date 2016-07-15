@@ -1,7 +1,7 @@
 ---
 title: "Airport effects on U.S. County Unemployment Rates"
 author: "Robby Powell"
-date: "`r format(Sys.Date(), '%Y-%b-%d')`"
+date: "`r format(Sys.Date(), '%Y-%B-%d')`"
 output: 
   html_document: 
     keep_md: yes
@@ -134,7 +134,7 @@ sessionInfo()
 ```
 
 # Appendices
-This section will show the full code without interspersed text that does not consist of comments within the code itself.
+This section will show the full code of the analysis scripts.
 
 ## Appendix A: Complete Analysis
 ```{r appendixA, eval = FALSE}
@@ -142,7 +142,7 @@ This section will show the full code without interspersed text that does not con
 
 ```
 
-## Appendix B: Airport Location
+## Appendix B: Airport Location from openflight.org
 ```{r appendixB, eval = FALSE}
 # File url
 file <- "https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat"
@@ -165,7 +165,7 @@ names(airports) <- c("airport.id", "name", "city", "country", "iata.faa.code",
   write.csv(airports, dest, row.names = FALSE)
 ```
 
-## Appendix C: County Shapefile
+## Appendix C: County Shapefile from Census Bureau
 ```{r appendixC, eval = FALSE}
 # County shapefile url
 url <- "ftp://ftp2.census.gov/geo/tiger/TIGER2015/COUNTY/tl_2015_us_county.zip"

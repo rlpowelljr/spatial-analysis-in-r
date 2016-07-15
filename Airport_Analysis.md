@@ -1,6 +1,6 @@
 # Airport effects on U.S. County Unemployment Rates
 Robby Powell  
-`r format(Sys.Date(), '%Y-%b-%d')`  
+`r format(Sys.Date(), '%Y-%B-%d')`  
 
 # Introduction
 This is my response to Ari Lamstein's 
@@ -63,191 +63,67 @@ The comments after the packages explain why I am using them.
 # data cleaning
 library(tidyr)
 library(dplyr)
-```
-
-```
-## 
-## Attaching package: 'dplyr'
-```
-
-```
-## The following objects are masked from 'package:stats':
-## 
-##     filter, lag
-```
-
-```
-## The following objects are masked from 'package:base':
-## 
-##     intersect, setdiff, setequal, union
-```
-
-```r
 library(magrittr)
-```
 
-```
-## 
-## Attaching package: 'magrittr'
-```
-
-```
-## The following object is masked from 'package:tidyr':
-## 
-##     extract
-```
-
-```r
 # data table display
 library(Hmisc)
-```
-
-```
-## Loading required package: lattice
-```
-
-```
-## Loading required package: survival
-```
-
-```
-## Loading required package: Formula
-```
-
-```
-## Loading required package: ggplot2
-```
-
-```
-## 
-## Attaching package: 'Hmisc'
-```
-
-```
-## The following objects are masked from 'package:dplyr':
-## 
-##     combine, src, summarize
-```
-
-```
-## The following objects are masked from 'package:base':
-## 
-##     format.pval, round.POSIXt, trunc.POSIXt, units
-```
-
-```r
 library(tables)
 
 # general plotting
 library(ggplot2)
 library(gridExtra)
-```
 
-```
-## 
-## Attaching package: 'gridExtra'
-```
-
-```
-## The following object is masked from 'package:Hmisc':
-## 
-##     combine
-```
-
-```
-## The following object is masked from 'package:dplyr':
-## 
-##     combine
-```
-
-```r
 # refine plot displays
 library(scales)
 library(RColorBrewer)
 
 # mapping
 library(rgdal)
-```
-
-```
-## Loading required package: sp
-```
-
-```
-## rgdal: version: 1.1-10, (SVN revision 622)
-##  Geospatial Data Abstraction Library extensions to R successfully loaded
-##  Loaded GDAL runtime: GDAL 1.11.3, released 2015/09/16
-##  Path to GDAL shared files: /usr/local/Cellar/gdal/1.11.3_1/share/gdal
-##  Loaded PROJ.4 runtime: Rel. 4.9.2, 08 September 2015, [PJ_VERSION: 492]
-##  Path to PROJ.4 shared files: (autodetected)
-##  Linking to sp version: 1.2-3
-```
-
-```r
 library(GISTools)
 ```
 
-```
-## Loading required package: maptools
-```
+# Data Import and Cleaning
 
-```
-## Checking rgeos availability: TRUE
-```
+## Data Import
 
-```
-## 
-## Attaching package: 'maptools'
-```
+## Dataset Cleaning
 
-```
-## The following object is masked from 'package:Hmisc':
-## 
-##     label
-```
+## Shapefile Import
 
-```
-## Loading required package: MASS
-```
+## Identifying Counties associated with Airports
 
-```
-## 
-## Attaching package: 'MASS'
-```
+## Calculating County Distance to the Nearest Airport
 
-```
-## The following object is masked from 'package:dplyr':
-## 
-##     select
-```
+# Exploratory Analysis
 
-```
-## Loading required package: rgeos
-```
+# Setting up the Model Data
 
-```
-## rgeos version: 0.3-19, (SVN revision 524)
-##  GEOS runtime version: 3.5.0-CAPI-1.9.0 r4084 
-##  Linking to sp version: 1.2-3 
-##  Polygon checking: TRUE
-```
+# Relationship between distance to airport and unemployment rate
 
-```
-## 
-## Attaching package: 'rgeos'
-```
+## Training and Testing Datasets
 
-```
-## The following object is masked from 'package:Hmisc':
-## 
-##     translate
-```
+## Training the Model
 
+## Testing the Model
 
+## Analyzing the Model
 
+# Relationship between airport passenger volume and unemployment rate
+
+## Training and Testing Datasets
+
+## Training the Model
+
+## Testing the Model
+
+## Analyzing the Model
+
+# Discussion
+
+# Conclusions
 
 # Computer Environment
-Here is the computer that I used for the analysis.
+The computer used for the analysis was a Late 2013 15" MacBook Pro, with 16 GB 1600 MHz DDR3 RAM and a 2.6 GHz Intel Core i7 Processor.
 
 
 ```r
@@ -287,12 +163,12 @@ sessionInfo()
 ```
 
 # Appendices
-This section will show the full code without interspersed text that does not consist of comments within the code itself.
+This section will show the full code of the analysis scripts.
 
 ## Appendix A: Complete Analysis
 
 
-## Appendix B: Airport Location
+## Appendix B: Airport Location from openflight.org
 
 ```r
 # File url
@@ -316,7 +192,7 @@ names(airports) <- c("airport.id", "name", "city", "country", "iata.faa.code",
   write.csv(airports, dest, row.names = FALSE)
 ```
 
-## Appendix C: County Shapefile
+## Appendix C: County Shapefile from Census Bureau
 
 ```r
 # County shapefile url
