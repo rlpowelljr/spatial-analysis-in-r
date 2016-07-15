@@ -1,8 +1,211 @@
 ---
 title: "Airport effects on U.S. County Unemployment Rates"
 author: "Robby Powell"
-date: "`r format(Sys.Date(), '%y-%b-%d')`"
+date: "`r format(Sys.Date(), '%Y-%b-%d')`"
 output: 
   html_document: 
     keep_md: yes
+    toc: yes
 ---
+
+# Introduction
+This is my response to Ari Lamstein's 
+R Shapefile [contest](http://www.arilamstein.com/blog/2016/07/12/announcing-r-shapefile-contest/). 
+
+## Analysis Question
+My Analysis consists of my efforts to answer the following questions:
+
+  1. What is the effect of distance to the nearest airport on a county's unemployment rate?
+  
+  2. How does the traffic of the nearest airport affect unemployment rates? This is measured on the airport's passenger emplanements and cargo movements.
+
+## Data Sources
+One of the rules of the contest is that the data are available for everyone to use. In order to meet this requirement, there are links for the data and shapefile locations below. 
+
+  1. Airport Traffic: [Federal Aviation Administration (FAA)](http://www.faa.gov/airports/planning_capacity/passenger_allcargo_stats/passenger/)
+
+  2. Airport Locations: [openflights.org](http://openflights.org/data.html)
+  
+  3. County Shapefile: [US Census Bureau](https://www.census.gov/geo/maps-data/data/tiger-line.html)
+  
+  4. Unemployment data: [Bureau of Labor Statistics (BLS)](http://download.bls.gov/pub/time.series/la/)
+  
+Where feasible, I have also included a series of scripts that may be used to download the exact files that I used for the analysis. These are located in the Appendicies along with the full analysis script for ease of implementation/testing by other analysts.
+  
+If it is not listed in this section, then it will be listed as either an R package, or it will be something that I create during the analysis and write-up processes.
+
+# Setup
+First, we need to set up our script for the analysis. In this case, we are setting up the main directory structure and the packages required for the analysis.
+
+## Directory setup
+
+In my case, I prefer to start the document off with setting up my main directories in variables. This allows me to use the `paste` and `paste0` functions in base R in order to ease the transfer of the scripts to other directories. 
+
+If you change directories, then all you need to do is to alter the `main.dir` variable, and everything else will follow. This reduces the need for changing the directory in multiple locations throughout an analysis.
+
+```{r directorySetup}
+# Main directory
+main.dir <- "~/spatial-analysis-in-r/"
+
+# Script directory
+script.dir <- paste0(main.dir, "scripts/")
+
+# data directory
+dat.dir <- paste0(main.dir, "data/")
+
+# output directory
+out.dir <- paste0(main.dir, "output/")
+```
+
+## Package setup
+
+The packages utilized in this analysis are below. Unless otherwise noted, they are available from CRAN.
+
+The comments after the packages explain why I am using them.
+
+```{r loadPackages, warning = FALSE, error = FALSE, message = FALSE}
+# data cleaning
+library(tidyr)
+library(dplyr)
+library(magrittr)
+
+# data table display
+library(Hmisc)
+library(tables)
+
+# general plotting
+library(ggplot2)
+library(gridExtra)
+
+# refine plot displays
+library(scales)
+library(RColorBrewer)
+
+# mapping
+library(rgdal)
+library(GISTools)
+```
+
+# Data Import and Cleaning
+
+## Data Import
+
+## Dataset Cleaning
+
+## Shapefile Import
+
+## Identifying Counties associated with Airports
+
+## Calculating County Distance to the Nearest Airport
+
+# Exploratory Analysis
+
+# Setting up the Model Data
+
+# Relationship between distance to airport and unemployment rate
+
+## Training and Testing Datasets
+
+## Training the Model
+
+## Testing the Model
+
+## Analyzing the Model
+
+# Relationship between airport passenger volume and unemployment rate
+
+## Training and Testing Datasets
+
+## Training the Model
+
+## Testing the Model
+
+## Analyzing the Model
+
+# Discussion
+
+# Conclusions
+
+# Computer Environment
+The computer used for the analysis was a Late 2013 15" MacBook Pro, with 16 GB 1600 MHz DDR3 RAM and a 2.6 GHz Intel Core i7 Processor.
+
+```{r computerInfo}
+sessionInfo()
+```
+
+# Appendices
+This section will show the full code without interspersed text that does not consist of comments within the code itself.
+
+## Appendix A: Complete Analysis
+```{r appendixA, eval = FALSE}
+
+
+```
+
+## Appendix B: Airport Location
+```{r appendixB, eval = FALSE}
+# File url
+file <- "https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat"
+
+# destination
+dest <- "~/spatial-analysis-in-r/data/airports/airports.dat.txt"
+
+# download file
+download.file(file, dest)
+
+# Check downloaded file
+airports <- read.csv(dest, header = FALSE)
+
+# name columns
+names(airports) <- c("airport.id", "name", "city", "country", "iata.faa.code",
+                     "icao.code", "latitude", "longitude", "altitude",
+                     "UTC.offset", "DST", "time.zone.olson")
+
+# save file with column names
+  write.csv(airports, dest, row.names = FALSE)
+```
+
+## Appendix C: County Shapefile
+```{r appendixC, eval = FALSE}
+# County shapefile url
+url <- "ftp://ftp2.census.gov/geo/tiger/TIGER2015/COUNTY/tl_2015_us_county.zip"
+
+# path
+path <- "~/spatial-analysis-in-r/data/census/"
+
+# destination
+dest <- paste0(path, "tl_2015_us_county.zip")
+
+# download file
+download.file(url, dest)
+
+# unzip file
+unzip(dest, exdir = path, junkpaths = TRUE)
+```
+
+## Appendix D: BLS Data
+```{r appendixD, eval = FALSE}
+
+# Set main part of url for downloading the files
+main.url <- "http://download.bls.gov/pub/time.series/la/"
+
+# Set main directory for download
+download.dir <- "~/spatial-analysis-in-r/data/bls/"
+
+# List of files to download
+file.list <- c("la.area", "la.area_type", "la.data.64.County", "la.measure",
+               "la.period", "la.series", "la.state_region_division")
+
+# combine download urls
+download.urls <- unlist(lapply(main.url, FUN = "paste0", file.list))
+
+# combine for file locations
+download.locations <- unlist(lapply(download.dir, FUN = "paste0", file.list))
+
+# download files
+for (file in 1:length(file.list)) {
+  if (!(file.list[file] %in% dir(download.dir))) {
+    download.file(url = download.urls[file], destfile = download.locations[file])
+  }
+}
+```
