@@ -193,34 +193,6 @@ bls.period
 ## 13    M13       AN AV Annual Average
 ```
 
-Import and examine the area definitions. These are usually the associated states.
-
-```r
-# la.period
-fname <- paste0(dat.dir, "/bls/la.area")
-bls.area <- read.table(fname, header = TRUE, stringsAsFactors = FALSE, 
-                      sep = "", skipNul = TRUE, fill = TRUE)
-
-head(bls.area)
-```
-
-```
-##   area_type_code       area_code  area_text display_level selectable
-## 1              A ST0100000000000    Alabama             0          T
-## 2              A ST0200000000000     Alaska             0          T
-## 3              A ST0400000000000    Arizona             0          T
-## 4              A ST0500000000000   Arkansas             0          T
-## 5              A ST0600000000000 California             0          T
-## 6              A ST0800000000000   Colorado             0          T
-##   sort_sequence
-## 1             1
-## 2           140
-## 3           182
-## 4           246
-## 5           372
-## 6           755
-```
-
 Import series definitions, which contains the names of the counties.
 
 ```r
@@ -306,17 +278,17 @@ bls.dat$state <-  str_extract(bls.dat$series_title, "[A-Z]{2}")
 bls.dat$FIPS <- substr(bls.dat$series_id, 6, 10)
 
 # Select columns
-bls.dat <- bls.dat[c("FIPS", "county", "state", "year", "value")]
+bls <- bls.dat[c("FIPS", "county", "state", "year", "value")]
 
 # Change names
-names(bls.dat) <- c("FIPS", "county", "state", "year", "UE")
+names(bls) <- c("FIPS", "county", "state", "year", "UE")
 ```
 
 Here is the final BLS dataset.
 
 
 ```r
-head(bls.dat)
+head(bls)
 ```
 
 ```
@@ -330,7 +302,7 @@ head(bls.dat)
 ```
 
 ```r
-summary(bls.dat)
+summary(bls)
 ```
 
 ```
@@ -353,10 +325,166 @@ summary(bls.dat)
 ```
 
 
-
 ## Airport Data
+Here, we import and check the airport dataset. This dataset is really clean, so it will be utilized as-is.
+
+
+```r
+fname <- paste0(dat.dir, "airports/airports.dat.txt")
+airports <- read.csv(fname, header = TRUE, stringsAsFactors = FALSE)
+
+summary(airports)
+```
+
+```
+##    airport.id       name               city             country         
+##  Min.   :   1   Length:8107        Length:8107        Length:8107       
+##  1st Qu.:2092   Class :character   Class :character   Class :character  
+##  Median :4257   Mode  :character   Mode  :character   Mode  :character  
+##  Mean   :4766                                                           
+##  3rd Qu.:7508                                                           
+##  Max.   :9541                                                           
+##  iata.faa.code       icao.code            latitude      
+##  Length:8107        Length:8107        Min.   :-90.000  
+##  Class :character   Class :character   1st Qu.:  8.825  
+##  Mode  :character   Mode  :character   Median : 34.988  
+##                                        Mean   : 26.818  
+##                                        3rd Qu.: 47.958  
+##                                        Max.   : 82.518  
+##    longitude           altitude         UTC.offset      
+##  Min.   :-179.877   Min.   :-1266.0   Min.   :-12.0000  
+##  1st Qu.: -79.022   1st Qu.:   38.0   1st Qu.: -5.0000  
+##  Median :   5.292   Median :  272.0   Median :  1.0000  
+##  Mean   :  -3.922   Mean   :  933.4   Mean   :  0.1692  
+##  3rd Qu.:  49.786   3rd Qu.: 1020.0   3rd Qu.:  4.0000  
+##  Max.   : 179.951   Max.   :14472.0   Max.   : 13.0000  
+##      DST            time.zone.olson   
+##  Length:8107        Length:8107       
+##  Class :character   Class :character  
+##  Mode  :character   Mode  :character  
+##                                       
+##                                       
+## 
+```
+
+```r
+head(airports)
+```
+
+```
+##   airport.id                       name         city          country
+## 1          1                     Goroka       Goroka Papua New Guinea
+## 2          2                     Madang       Madang Papua New Guinea
+## 3          3                Mount Hagen  Mount Hagen Papua New Guinea
+## 4          4                     Nadzab       Nadzab Papua New Guinea
+## 5          5 Port Moresby Jacksons Intl Port Moresby Papua New Guinea
+## 6          6                 Wewak Intl        Wewak Papua New Guinea
+##   iata.faa.code icao.code  latitude longitude altitude UTC.offset DST
+## 1           GKA      AYGA -6.081689  145.3919     5282         10   U
+## 2           MAG      AYMD -5.207083  145.7887       20         10   U
+## 3           HGU      AYMH -5.826789  144.2959     5388         10   U
+## 4           LAE      AYNZ -6.569828  146.7262      239         10   U
+## 5           POM      AYPY -9.443383  147.2200      146         10   U
+## 6           WWK      AYWK -3.583828  143.6692       19         10   U
+##        time.zone.olson
+## 1 Pacific/Port_Moresby
+## 2 Pacific/Port_Moresby
+## 3 Pacific/Port_Moresby
+## 4 Pacific/Port_Moresby
+## 5 Pacific/Port_Moresby
+## 6 Pacific/Port_Moresby
+```
 
 ## FAA Airport Traffic Data
+The FAA Airport Data consists of three Excel spreadsheets. These will be imported and combined before they are cleaned.
+
+
+```r
+fname <- paste0(dat.dir, "faa/CY12AllEnplanements.xlsx")
+faa.cy12 <- openxlsx::read.xlsx(fname)
+
+fname <- paste0(dat.dir, "faa/cy13-all-enplanements.xlsx")
+faa.cy13 <- openxlsx::read.xlsx(fname)
+
+fname <- paste0(dat.dir, "faa/CY14-all-enplanements.xlsx")
+faa.cy14 <- openxlsx::read.xlsx(fname, sheet = "data")
+
+fname <- paste0(dat.dir, "faa/preliminary-cy15-all-enplanements.xlsx")
+faa.cy15 <- openxlsx::read.xlsx(fname)
+
+# Select Annual Data, Rename columns, and add year.
+faa.cy11 <- faa.cy12[, c("ST", "Locid", "City", "Airport.Name", 
+                         "CY.11.Enplanements")]
+names(faa.cy11) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy11$year <- 2011
+
+faa.cy12 <- faa.cy12[, c("ST", "Locid", "City", "Airport.Name", 
+                         "CY.12.Enplanements")]
+names(faa.cy12) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy12$year <- 2012
+
+faa.cy13 <- faa.cy13[, c("ST", "Locid", "City", "Airport.Name",
+                         "CY.13.Enplanements")]
+names(faa.cy13) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy13$year <- 2013
+
+faa.cy14 <- faa.cy14[, c("ST", "Locid", "City", "Airport.Name",
+                         "CY.14.Enplanements")]
+names(faa.cy14) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy14$year <- 2014
+
+faa.cy15 <- faa.cy15[, c("ST", "Locid", "City", "Airport.Name",
+                         "CY.15.Enplanements")]
+names(faa.cy15) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy15$year <- 2015
+
+# Combine
+faa <- rbind(faa.cy11, faa.cy12, faa.cy13, faa.cy14, faa.cy15)
+
+summary(faa)
+```
+
+```
+##     state                id                city          
+##  Length:8433        Length:8433        Length:8433       
+##  Class :character   Class :character   Class :character  
+##  Mode  :character   Mode  :character   Mode  :character  
+##                                                          
+##                                                          
+##                                                          
+##                                                          
+##  airport.name        enplanements           year     
+##  Length:8433        Min.   :       0   Min.   :2011  
+##  Class :character   1st Qu.:       8   1st Qu.:2012  
+##  Mode  :character   Median :     156   Median :2013  
+##                     Mean   :  446406   Mean   :2013  
+##                     3rd Qu.:    8240   3rd Qu.:2014  
+##                     Max.   :49340732   Max.   :2015  
+##                     NA's   :7
+```
+
+```r
+head(faa)
+```
+
+```
+##   state  id      city                        airport.name enplanements
+## 1    AK ANC Anchorage Ted Stevens Anchorage International      2354987
+## 2    AK FAI Fairbanks             Fairbanks International       438188
+## 3    AK JNU    Juneau                Juneau International       355499
+## 4    AK BET    Bethel                              Bethel       152366
+## 5    AK KTN Ketchikan             Ketchikan International       102086
+## 6    AK ENA     Kenai                     Kenai Municipal        90806
+##   year
+## 1 2011
+## 2 2011
+## 3 2011
+## 4 2011
+## 5 2011
+## 6 2011
+```
+
+
 
 ## Shapefile Import
 

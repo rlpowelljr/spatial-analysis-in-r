@@ -204,17 +204,17 @@ bls.dat$state <-  str_extract(bls.dat$series_title, "[A-Z]{2}")
 bls.dat$FIPS <- substr(bls.dat$series_id, 6, 10)
 
 # Select columns
-bls.dat <- bls.dat[c("FIPS", "county", "state", "year", "value")]
+bls <- bls.dat[c("FIPS", "county", "state", "year", "value")]
 
 # Change names
-names(bls.dat) <- c("FIPS", "county", "state", "year", "UE")
+names(bls) <- c("FIPS", "county", "state", "year", "UE")
 ```
 
 Here is the final BLS dataset.
 
 ```{r blsDataPrep8}
-head(bls.dat)
-summary(bls.dat)
+head(bls)
+summary(bls)
 ```
 
 
