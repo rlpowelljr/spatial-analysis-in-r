@@ -219,14 +219,66 @@ summary(bls.dat)
 
 
 ## Airport Data
-Here, we import and check the airport dataset.
+Here, we import and check the airport dataset. This dataset is really clean, so it will be utilized as-is.
 
 ```{r airportPrep}
+fname <- paste0(dat.dir, "airports/airports.dat.txt")
+airports <- read.csv(fname, header = TRUE, stringsAsFactors = FALSE)
 
+summary(airports)
+head(airports)
+```
+
+## FAA Airport Traffic Data
+The FAA Airport Data consists of three Excel spreadsheets. These will be imported and combined before they are cleaned.
+
+```{r faaPrep}
+fname <- paste0(dat.dir, "faa/CY12AllEnplanements.xlsx")
+faa.cy12 <- openxlsx::read.xlsx(fname)
+
+fname <- paste0(dat.dir, "faa/cy13-all-enplanements.xlsx")
+faa.cy13 <- openxlsx::read.xlsx(fname)
+
+fname <- paste0(dat.dir, "faa/CY14-all-enplanements.xlsx")
+faa.cy14 <- openxlsx::read.xlsx(fname, sheet = "data")
+
+fname <- paste0(dat.dir, "faa/preliminary-cy15-all-enplanements.xlsx")
+faa.cy15 <- openxlsx::read.xlsx(fname)
+
+# Select Annual Data, Rename columns, and add year.
+faa.cy11 <- faa.cy12[, c("ST", "Locid", "City", "Airport.Name", 
+                         "CY.11.Enplanements")]
+names(faa.cy11) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy11$year <- 2011
+
+faa.cy12 <- faa.cy12[, c("ST", "Locid", "City", "Airport.Name", 
+                         "CY.12.Enplanements")]
+names(faa.cy12) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy12$year <- 2012
+
+faa.cy13 <- faa.cy13[, c("ST", "Locid", "City", "Airport.Name",
+                         "CY.13.Enplanements")]
+names(faa.cy13) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy13$year <- 2013
+
+faa.cy14 <- faa.cy14[, c("ST", "Locid", "City", "Airport.Name",
+                         "CY.14.Enplanements")]
+names(faa.cy14) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy14$year <- 2014
+
+faa.cy15 <- faa.cy15[, c("ST", "Locid", "City", "Airport.Name",
+                         "CY.15.Enplanements")]
+names(faa.cy15) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy15$year <- 2015
+
+# Combine
+faa <- rbind(faa.cy11, faa.cy12, faa.cy13, faa.cy14, faa.cy15)
+
+summary(faa)
+head(faa)
 ```
 
 
-## FAA Airport Traffic Data
 
 ## Shapefile Import
 
