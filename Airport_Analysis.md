@@ -5,8 +5,7 @@ Robby Powell
 
 
 # Introduction
-This is my response to Ari Lamstein's 
-R Shapefile [contest](http://www.arilamstein.com/blog/2016/07/12/announcing-r-shapefile-contest/). 
+This is my response to Ari Lamstein's R Shapefile [contest](http://www.arilamstein.com/blog/2016/07/12/announcing-r-shapefile-contest/). 
 
 ## Analysis Question
 My Analysis consists of my efforts to answer the following questions:
@@ -98,6 +97,9 @@ library(sp)
 library(maps)
 library(rgdal)
 library(GISTools)
+
+# distance calculation
+library(geosphere)
 ```
 
 # Data Import and Cleaning
@@ -598,24 +600,139 @@ points(airports, xlim = alaska.long.limits, ylim = alaska.lat.limits,
 
 ![](figures/countyAirportIdentification1-1.png)<!-- -->
 
+This snippet of code will determine which the county within which each airport resides. 
+
 
 ```r
-airports$county <- over(airports, county)[, c("GEOID", "NAMELSAD")]
+airports$county.id <- 
+  sp::over(airports, county)$GEOID
 
-head(airports$county)
+head(airports)
 ```
 
 ```
-##      GEOID        NAMELSAD
-## 319  18133   Putnam County
-## 1105 26027     Cass County
-## 1122 39059 Guernsey County
-## 1471 55029     Door County
-## 1508 42133     York County
-## 1618 41059 Umatilla County
+##                coordinates airport.id                            name
+## 319  (-86.81381, 39.63356)       6891           Putnam County Airport
+## 1105 (-86.12801, 41.99293)       6890      Dowagiac Municipal Airport
+## 1122 (-81.57758, 39.97503)       6889     Cambridge Municipal Airport
+## 1471 (-87.42156, 44.84367)       6885  Door County Cherryland Airport
+## 1508 (-76.64719, 39.79482)       6884    Shoestring Aviation Airfield
+## 1618   (-118.8414, 45.695)       6883 Eastern Oregon Regional Airport
+##              city       country iata.faa.code icao.code altitude
+## 319   Greencastle United States           4I7       \\N      842
+## 1105     Dowagiac United States           C91       \\N      748
+## 1122    Cambridge United States           CDI       \\N      799
+## 1471 Sturgeon Bay United States           SUE       \\N      725
+## 1508 Stewartstown United States           0P2       \\N     1000
+## 1618    Pendleton United States           PDT      KPDT     1497
+##      UTC.offset DST     time.zone.olson county.id
+## 319          -5   U    America/New_York     18133
+## 1105         -5   U    America/New_York     26027
+## 1122         -5   U    America/New_York     39059
+## 1471         -6   U     America/Chicago     55029
+## 1508         -5   U    America/New_York     42133
+## 1618         -8   A America/Los_Angeles     41059
 ```
 
 ## Calculate County Distance to the Nearest Airport
+Now, it is time to calculate the distance of the county centroids to their nearest airport. In order to determine this quantity, we will utilize the Great Circle Formula, or, more specifically, the Haversine Formula to calculate the distances.
+
+Thankfully, we do not have to create this formula from scratch. It is located in the `geosphere` package, which is available on CRAN. The results will be in meters. 
+
+Due to the way the output is being used, there is no need to change units; however, because distance is easier for most to understand in miles, we will convert the resulting distances to miles after we have determined the minimum distance for the airports.
+
+
+```r
+# Set up output data frame
+apt.dist.dat <- data.frame(county.id = county$GEOID,
+                           stringsAsFactors = F)
+
+# Calculate distance between each airport
+for (apt in airports$airport.id) {
+  # The id is created such that the numbers will not make R think it is creating column number XXX vice just adding a new column.
+  apt.id <- paste0("airport.", apt)
+  
+  # get coordinates for airports and counties
+  apt.coords <- coordinates(airports)[airports$airport.id == apt,]
+  county.coords <- coordinates(county)
+  
+  apt.dist.dat[, apt.id] <- distHaversine(apt.coords, county.coords)
+}
+```
+
+Now that we have the distances calculated, we have to determine which airport is the closest.
+
+
+```r
+# set up output data for county distances
+cnty.dist <- data.frame(county = NA_character_, 
+                        dist = NA_real_, 
+                        airport.id = NA_character_,
+                        stringsAsFactors = FALSE)
+
+# This function will return the minimum distance.
+min.dist.fn <- function(temp) {
+
+  # Select airport with smallest distance
+  min.index <- which.min(temp)
+  
+  # Return distance
+  min.dist <- temp[min.index]
+  
+  # Get airport ID
+  apt.id <- names(temp)[min.index]
+  
+  # output data
+  out <- cbind(min.dist, apt.id)
+  return(out)
+}
+
+# Get counties
+counties <- apt.dist.dat$county.id
+# Get minimum distance
+min.dist <- apply(apt.dist.dat[,-1], MARGIN = 1, FUN = min.dist.fn)
+
+min.dist <- t(unlist(min.dist))
+
+min.dist <- data.frame(min.dist, stringsAsFactors = F)
+
+names(min.dist) <- c("min.distance", "airport.id")
+
+# convert min.dist to miles
+min.dist$min.distance <- as.numeric(min.dist$min.distance)/1609.34
+
+# Get airport ID number
+min.dist$airport.id <- gsub("airport.", "", min.dist$airport.id)
+
+cnty.dist <- cbind(counties, min.dist)
+
+summary(cnty.dist)
+```
+
+```
+##     counties     min.distance       airport.id       
+##  01001  :   1   Min.   :   0.343   Length:3233       
+##  01003  :   1   1st Qu.:  13.169   Class :character  
+##  01005  :   1   Median :  24.080   Mode  :character  
+##  01007  :   1   Mean   :  59.778                     
+##  01009  :   1   3rd Qu.:  37.098                     
+##  01011  :   1   Max.   :3507.561                     
+##  (Other):3227
+```
+
+```r
+head(cnty.dist)
+```
+
+```
+##   counties min.distance airport.id
+## 1    31039    39.472667       3753
+## 2    53069    23.228418       7085
+## 3    35011    62.292263       3834
+## 4    31109     5.946045       3543
+## 5    31129    56.432641       5740
+## 6    72085  1047.847616       7889
+```
 
 ## Create Final Data Set
 
@@ -657,13 +774,14 @@ sessionInfo()
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] GISTools_0.7-4     rgeos_0.3-19       MASS_7.3-45       
-##  [4] maptools_0.8-39    rgdal_1.1-10       maps_3.1.0        
-##  [7] sp_1.2-3           RColorBrewer_1.1-2 scales_0.4.0      
-## [10] gridExtra_2.2.1    tables_0.7.79      Hmisc_3.17-4      
-## [13] ggplot2_2.1.0      Formula_1.2-1      survival_2.39-5   
-## [16] lattice_0.20-33    stringr_1.0.0      magrittr_1.5      
-## [19] dplyr_0.5.0        tidyr_0.5.1        openxlsx_3.0.0    
+##  [1] geosphere_1.5-5    GISTools_0.7-4     rgeos_0.3-19      
+##  [4] MASS_7.3-45        maptools_0.8-39    rgdal_1.1-10      
+##  [7] maps_3.1.0         sp_1.2-3           RColorBrewer_1.1-2
+## [10] scales_0.4.0       gridExtra_2.2.1    tables_0.7.79     
+## [13] Hmisc_3.17-4       ggplot2_2.1.0      Formula_1.2-1     
+## [16] survival_2.39-5    lattice_0.20-33    stringr_1.0.0     
+## [19] magrittr_1.5       dplyr_0.5.0        tidyr_0.5.1       
+## [22] openxlsx_3.0.0    
 ## 
 ## loaded via a namespace (and not attached):
 ##  [1] Rcpp_0.12.5         formatR_1.4         plyr_1.8.4         
@@ -683,6 +801,11 @@ This section will show the full code of the analysis scripts.
 
 ## Appendix A: Complete Analysis
 
+```r
+# PLACE HOLDER FOR CODE HERE
+
+# NEED TO SPIN RMD DOCUMENT AND DELETE APPENDIX CODE BEFORE PASTING
+```
 
 ## Appendix B: Airport Location from openflight.org
 

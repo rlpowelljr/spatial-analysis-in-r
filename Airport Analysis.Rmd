@@ -103,6 +103,9 @@ library(sp)
 library(maps)
 library(rgdal)
 library(GISTools)
+
+# distance calculation
+library(geosphere)
 ```
 
 # Data Import and Cleaning
@@ -288,13 +291,15 @@ head(faa)
 
 
 ## Shapefile Import
+This first snippet of code shows how to import the Census Shapefile.
+
 ```{r shapefileImport}
 dsn <- "/Users/Robby/spatial-analysis-in-r/data/census/"
 layer <- "tl_2015_us_county"
 county <- rgdal::readOGR(dsn = dsn, layer = layer)
 ```
 
-Because the United States has such a large spread of territory around the world, it is necessary to set limits for the maps. In this case, we will be using maps for the Continental U.S. (CONUS), Alaska, and Hawaii. The limits chosen for this exercise are listed below.
+Because the United States has such a large spread of territory and protectorates around the world, it is necessary to set limits for the maps. In this case, we will be using maps for the Continental U.S. (CONUS), Alaska, and Hawaii. The limits chosen for this exercise are listed below.
 
 ```{r plotLimitsCONUS}
 # Continental US (CONUS)
@@ -340,7 +345,7 @@ First, in order to get an idea of what things look like, we will need to plot th
 # filter airport coordinates based on FAA codes in faa.data
 airports <- airports[airports$country == "United States",]
 
-#filter for CONUS, AK, and HI
+#filter for CONUS, AK, and HI airports
 airports <- 
   airports[(between(airports$latitude, conus.min.lat, conus.max.lat) &
            between(airports$longitude, conus.min.long, conus.max.long)) |
@@ -353,6 +358,7 @@ airports <-
 coordinates(airports) <- c("longitude", "latitude")
 proj4string(airports) <- proj4string(county)
 
+# Set layout for image.
 layout(matrix(c(1,1,1,1,
                 1,1,1,1,
                 2,2,3,3,
@@ -379,15 +385,99 @@ points(airports, xlim = alaska.long.limits, ylim = alaska.lat.limits,
        pch = 20)
 ```
 
-This snippet of code will determine which the county wi
+This snippet of code will determine which the county within which each airport resides. 
 
 ```{r countyAirportIdentification2}
-airports[, c("county.id", "county.name")] <- over(airports, county)[, c("GEOID", "NAMELSAD")]
+# get county ID
+airports$county.id <- 
+  sp::over(airports, county)$GEOID
 
+# look at results
 head(airports)
 ```
 
 ## Calculate County Distance to the Nearest Airport
+Now, it is time to calculate the distance of the county centroids to their nearest airport. In order to determine this quantity, we will utilize the Great Circle Formula, or, more specifically, the Haversine Formula to calculate the distances.
+
+Thankfully, we do not have to create this formula from scratch. It is located in the `geosphere` package, which is available on CRAN. The results will be in meters. 
+
+Due to the way the output is being used, there is no need to change units; however, because distance is easier for most to understand in miles, we will convert the resulting distances to miles after we have determined the minimum distance for the airports.
+
+```{r distCalc}
+# Set up output data frame
+apt.dist.dat <- data.frame(county.id = county$GEOID,
+                           stringsAsFactors = F)
+
+# Calculate distance between each airport
+# NOTE: Consider building function instead of looping.
+for (apt in airports$airport.id) {
+  # The id is created such that the numbers will not make R think it is
+  # creating column number XXX vice just adding a new column.
+  apt.id <- paste0("airport.", apt)
+  
+  # get coordinates for airports and counties
+  apt.coords <- coordinates(airports)[airports$airport.id == apt,]
+  county.coords <- coordinates(county)
+  
+  # calculate distance
+  apt.dist.dat[, apt.id] <- distHaversine(apt.coords, county.coords)
+}
+```
+
+Now that we have the distances calculated, we have to determine which airport is the closest.
+
+```{r distCalcMin}
+
+# set up output data for county distances
+cnty.dist <- data.frame(county = NA_character_, 
+                        dist = NA_real_, 
+                        airport.id = NA_character_,
+                        stringsAsFactors = FALSE)
+
+# This function will return the minimum distance.
+min.dist.fn <- function(temp) {
+
+  # Select airport with smallest distance
+  min.index <- which.min(temp)
+  
+  # Return distance
+  min.dist <- temp[min.index]
+  
+  # Get airport ID
+  apt.id <- names(temp)[min.index]
+  
+  # output data
+  out <- cbind(min.dist, apt.id)
+  return(out)
+}
+
+# Get counties
+counties <- apt.dist.dat$county.id
+# Get minimum distance
+min.dist <- apply(apt.dist.dat[,-1], MARGIN = 1, FUN = min.dist.fn)
+
+# transpose and convert from list
+min.dist <- t(unlist(min.dist))
+
+# create data frame
+min.dist <- data.frame(min.dist, stringsAsFactors = F)
+
+# give column names
+names(min.dist) <- c("min.distance", "airport.id")
+
+# convert min.dist to miles
+min.dist$min.distance <- as.numeric(min.dist$min.distance)/1609.34
+
+# Get airport ID number
+min.dist$airport.id <- gsub("airport.", "", min.dist$airport.id)
+
+# create final distance data set.
+cnty.dist <- cbind(counties, min.dist)
+
+# look at resulting data set
+summary(cnty.dist)
+head(cnty.dist)
+```
 
 ## Create Final Data Set
 
@@ -421,7 +511,9 @@ This section will show the full code of the analysis scripts.
 
 ## Appendix A: Complete Analysis
 ```{r appendixA, eval = FALSE}
+# PLACE HOLDER FOR CODE HERE
 
+# NEED TO SPIN RMD DOCUMENT AND DELETE APPENDIX CODE BEFORE PASTING
 
 ```
 
