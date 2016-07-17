@@ -2,6 +2,8 @@
 Robby Powell  
 `r format(Sys.Date(), '%Y-%B-%d')`  
 
+
+
 # Introduction
 This is my response to Ari Lamstein's 
 R Shapefile [contest](http://www.arilamstein.com/blog/2016/07/12/announcing-r-shapefile-contest/). 
@@ -102,7 +104,7 @@ library(GISTools)
 In this section, I will import and clean the data.
 
 ## BLS Data
-First, I will import the main data set, whihc is labeled `la.data.64.County`. This contains all of the unemployment numbers.
+First, I will import the main data set, which is labeled `la.data.64.County`. This contains all of the unemployment numbers.
 
 
 ```r
@@ -169,6 +171,7 @@ bls.measure
 
 Import and examine the period definitions.
 
+
 ```r
 # la.period
 fname <- paste0(dat.dir, "/bls/la.period")
@@ -196,6 +199,7 @@ bls.period
 ```
 
 Import series definitions, which contains the names of the counties.
+
 
 ```r
 # la.period
@@ -503,29 +507,20 @@ county <- rgdal::readOGR(dsn = dsn, layer = layer)
 ## It has 17 fields
 ```
 
-```r
-plot(county)
-```
-
-![](Airport_Analysis_files/figure-html/shapefileImport-1.png)<!-- -->
-As you can see from the map, we need to set limits for the maps. In this case, I will list the box that I will utilize for the US, Hawaii, and Alaska, which is the focus of this analysis.
+Because the United States has such a large spread of territory around the world, it is necessary to set limits for the maps. In this case, we will be using maps for the Continental U.S. (CONUS), Alaska, and Hawaii. The limits chosen for this exercise are listed below.
 
 
 ```r
 # Continental US (CONUS)
-conus.min.lat <- 24
+conus.min.lat <- 25
 conus.max.lat <- 50
 conus.min.long <- -126
 conus.max.long <- -65
 
 conus.long.limits <- c(conus.min.long, conus.max.long)
 conus.lat.limits <- c(conus.min.lat, conus.max.lat)
-
-plot(county, xlim = conus.long.limits, ylim = conus.lat.limits,
-     main = "CONUS")
 ```
 
-![](Airport_Analysis_files/figure-html/plotLimits-1.png)<!-- -->
 
 ```r
 # Hawaii
@@ -536,12 +531,8 @@ hawaii.max.long <- -154
 
 hawaii.long.limits <- c(hawaii.min.long, hawaii.max.long)
 hawaii.lat.limits <- c(hawaii.min.lat, hawaii.max.lat)
-
-plot(county, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
-     main = "Hawaii")
 ```
 
-![](Airport_Analysis_files/figure-html/plotLimits-2.png)<!-- -->
 
 ```r
 # Alaska
@@ -552,14 +543,77 @@ alaska.max.long <- -129
 
 alaska.long.limits <- c(alaska.min.long, alaska.max.long)
 alaska.lat.limits <- c(alaska.min.lat, alaska.max.lat)
-
-plot(county, xlim = alaska.long.limits, ylim = alaska.lat.limits,
-     main = "Alaska")
 ```
 
-![](Airport_Analysis_files/figure-html/plotLimits-3.png)<!-- -->
-
 ## Identify Counties associated with Airports
+Now that we have all of the data available, it is time to identify the relationship between the airports and counties. In this effort, I will first overlay the airports over the counties, and then determine which county contains the airports.
+
+An output dataset will be produced, which can then be combined with all of the data to produce the final dataset.
+
+First, in order to get an idea of what things look like, we will need to plot the airports and the counties on the same map. In order to reduce the number of images, I will put the maps together in a single image.
+
+
+```r
+# filter airport coordinates based on FAA codes in faa.data
+airports <- airports[airports$country == "United States",]
+
+#filter for CONUS, AK, and HI
+airports <- 
+  airports[(between(airports$latitude, conus.min.lat, conus.max.lat) &
+           between(airports$longitude, conus.min.long, conus.max.long)) |
+           (between(airports$latitude, hawaii.min.lat, hawaii.max.lat) &
+           between(airports$longitude, hawaii.min.long, hawaii.max.long)) |
+           (between(airports$latitude, alaska.min.lat, alaska.max.lat) &
+           between(airports$longitude, alaska.min.long, alaska.max.long)),]
+
+# Prep airport coordinates
+coordinates(airports) <- c("longitude", "latitude")
+proj4string(airports) <- proj4string(county)
+
+layout(matrix(c(1,1,1,1,
+                1,1,1,1,
+                2,2,3,3,
+                2,2,3,3), ncol = 4, nrow = 4, byrow = TRUE),
+       respect = TRUE)
+
+# CONUS Plot (Plot 1)
+plot(county, xlim = conus.long.limits, ylim = conus.lat.limits,
+     main = "Plot of Airports and Counties", border = "light grey",
+     lwd = 0.25)
+points(airports, xlim = conus.long.limits, ylim = conus.lat.limits,
+       pch = 20, cex = 0.5)
+
+# Hawaii Plot (Plot 2)
+plot(county, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+     border = "light grey", lwd = 0.25)
+points(airports, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+       pch = 20)
+
+# Alaska Plot (Plot 3)
+plot(county, xlim = alaska.long.limits, ylim = alaska.lat.limits,
+     border = "light grey", lwd = 0.25)
+points(airports, xlim = alaska.long.limits, ylim = alaska.lat.limits,
+       pch = 20)
+```
+
+![](figures/countyAirportIdentification1-1.png)<!-- -->
+
+
+```r
+airports$county <- over(airports, county)[, c("GEOID", "NAMELSAD")]
+
+head(airports$county)
+```
+
+```
+##      GEOID        NAMELSAD
+## 319  18133   Putnam County
+## 1105 26027     Cass County
+## 1122 39059 Guernsey County
+## 1471 55029     Door County
+## 1508 42133     York County
+## 1618 41059 Umatilla County
+```
 
 ## Calculate County Distance to the Nearest Airport
 
