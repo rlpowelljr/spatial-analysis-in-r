@@ -96,6 +96,8 @@ library(scales)
 library(RColorBrewer)
 
 # mapping
+library(sp)
+library(maps)
 library(rgdal)
 library(GISTools)
 ```
@@ -193,7 +195,7 @@ bls.dat <- bls.dat[bls.dat$measure_text == "unemployment rate", ]
 bls.dat <- bls.dat[, c("series_id", "year", "value", 
                        "series_title", "measure_text")]
 
-# Create county name and state variables
+# Create county name and state variables for easier identification
 bls.dat$county <- str_extract(bls.dat$series_title, 
                               "[A-za-z.//]*\\s*[A-za-z.//]*\\s*[A-Za-z.//]*,")
 bls.dat$county <- trimws(gsub(",", "", bls.dat$county))
@@ -281,6 +283,52 @@ head(faa)
 
 
 ## Shapefile Import
+```{r shapefileImport}
+dsn <- "/Users/Robby/spatial-analysis-in-r/data/census/"
+layer <- "tl_2015_us_county"
+county <- rgdal::readOGR(dsn = dsn, layer = layer)
+
+plot(county)
+```
+As you can see from the map, we need to set limits for the maps. In this case, I will list the box that I will utilize for the US, Hawaii, and Alaska, which is the focus of this analysis.
+
+```{r plotLimits}
+# Continental US (CONUS)
+conus.min.lat <- 24
+conus.max.lat <- 50
+conus.min.long <- -126
+conus.max.long <- -65
+
+conus.long.limits <- c(conus.min.long, conus.max.long)
+conus.lat.limits <- c(conus.min.lat, conus.max.lat)
+
+plot(county, xlim = conus.long.limits, ylim = conus.lat.limits,
+     main = "CONUS")
+
+# Hawaii
+hawaii.min.lat <- 18
+hawaii.max.lat <- 23
+hawaii.min.long <- -161 
+hawaii.max.long <- -154
+
+hawaii.long.limits <- c(hawaii.min.long, hawaii.max.long)
+hawaii.lat.limits <- c(hawaii.min.lat, hawaii.max.lat)
+
+plot(county, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+     main = "Hawaii")
+
+# Alaska
+alaska.min.lat <- 52
+alaska.max.lat <- 72
+alaska.min.long <- -177
+alaska.max.long <- -129
+
+alaska.long.limits <- c(alaska.min.long, alaska.max.long)
+alaska.lat.limits <- c(alaska.min.lat, alaska.max.lat)
+
+plot(county, xlim = alaska.long.limits, ylim = alaska.lat.limits,
+     main = "Alaska")
+```
 
 ## Identify Counties associated with Airports
 

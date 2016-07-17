@@ -92,6 +92,8 @@ library(scales)
 library(RColorBrewer)
 
 # mapping
+library(sp)
+library(maps)
 library(rgdal)
 library(GISTools)
 ```
@@ -267,7 +269,7 @@ bls.dat <- bls.dat[bls.dat$measure_text == "unemployment rate", ]
 bls.dat <- bls.dat[, c("series_id", "year", "value", 
                        "series_title", "measure_text")]
 
-# Create county name and state variables
+# Create county name and state variables for easier identification
 bls.dat$county <- str_extract(bls.dat$series_title, 
                               "[A-za-z.//]*\\s*[A-za-z.//]*\\s*[A-Za-z.//]*,")
 bls.dat$county <- trimws(gsub(",", "", bls.dat$county))
@@ -488,6 +490,75 @@ head(faa)
 
 ## Shapefile Import
 
+```r
+dsn <- "/Users/Robby/spatial-analysis-in-r/data/census/"
+layer <- "tl_2015_us_county"
+county <- rgdal::readOGR(dsn = dsn, layer = layer)
+```
+
+```
+## OGR data source with driver: ESRI Shapefile 
+## Source: "/Users/Robby/spatial-analysis-in-r/data/census/", layer: "tl_2015_us_county"
+## with 3233 features
+## It has 17 fields
+```
+
+```r
+plot(county)
+```
+
+![](Airport_Analysis_files/figure-html/shapefileImport-1.png)<!-- -->
+As you can see from the map, we need to set limits for the maps. In this case, I will list the box that I will utilize for the US, Hawaii, and Alaska, which is the focus of this analysis.
+
+
+```r
+# Continental US (CONUS)
+conus.min.lat <- 24
+conus.max.lat <- 50
+conus.min.long <- -126
+conus.max.long <- -65
+
+conus.long.limits <- c(conus.min.long, conus.max.long)
+conus.lat.limits <- c(conus.min.lat, conus.max.lat)
+
+plot(county, xlim = conus.long.limits, ylim = conus.lat.limits,
+     main = "CONUS")
+```
+
+![](Airport_Analysis_files/figure-html/plotLimits-1.png)<!-- -->
+
+```r
+# Hawaii
+hawaii.min.lat <- 18
+hawaii.max.lat <- 23
+hawaii.min.long <- -161 
+hawaii.max.long <- -154
+
+hawaii.long.limits <- c(hawaii.min.long, hawaii.max.long)
+hawaii.lat.limits <- c(hawaii.min.lat, hawaii.max.lat)
+
+plot(county, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+     main = "Hawaii")
+```
+
+![](Airport_Analysis_files/figure-html/plotLimits-2.png)<!-- -->
+
+```r
+# Alaska
+alaska.min.lat <- 52
+alaska.max.lat <- 72
+alaska.min.long <- -177
+alaska.max.long <- -129
+
+alaska.long.limits <- c(alaska.min.long, alaska.max.long)
+alaska.lat.limits <- c(alaska.min.lat, alaska.max.lat)
+
+plot(county, xlim = alaska.long.limits, ylim = alaska.lat.limits,
+     main = "Alaska")
+```
+
+![](Airport_Analysis_files/figure-html/plotLimits-3.png)<!-- -->
+
 ## Identify Counties associated with Airports
 
 ## Calculate County Distance to the Nearest Airport
@@ -533,12 +604,12 @@ sessionInfo()
 ## 
 ## other attached packages:
 ##  [1] GISTools_0.7-4     rgeos_0.3-19       MASS_7.3-45       
-##  [4] maptools_0.8-39    rgdal_1.1-10       sp_1.2-3          
-##  [7] RColorBrewer_1.1-2 scales_0.4.0       gridExtra_2.2.1   
-## [10] tables_0.7.79      Hmisc_3.17-4       ggplot2_2.1.0     
-## [13] Formula_1.2-1      survival_2.39-5    lattice_0.20-33   
-## [16] stringr_1.0.0      magrittr_1.5       dplyr_0.5.0       
-## [19] tidyr_0.5.1        openxlsx_3.0.0    
+##  [4] maptools_0.8-39    rgdal_1.1-10       maps_3.1.0        
+##  [7] sp_1.2-3           RColorBrewer_1.1-2 scales_0.4.0      
+## [10] gridExtra_2.2.1    tables_0.7.79      Hmisc_3.17-4      
+## [13] ggplot2_2.1.0      Formula_1.2-1      survival_2.39-5   
+## [16] lattice_0.20-33    stringr_1.0.0      magrittr_1.5      
+## [19] dplyr_0.5.0        tidyr_0.5.1        openxlsx_3.0.0    
 ## 
 ## loaded via a namespace (and not attached):
 ##  [1] Rcpp_0.12.5         formatR_1.4         plyr_1.8.4         
