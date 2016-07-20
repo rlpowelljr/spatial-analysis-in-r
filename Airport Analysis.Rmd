@@ -81,7 +81,6 @@ The comments after the packages explain why I am using them.
 library(openxlsx)
 
 # data cleaning
-library(tidyr)
 library(dplyr)
 library(magrittr)
 library(stringr)
@@ -92,15 +91,9 @@ library(tables)
 
 # general plotting
 library(ggplot2)
-library(gridExtra)
-
-# refine plot displays
-library(scales)
-library(RColorBrewer)
 
 # mapping
 library(sp)
-library(maps)
 library(rgdal)
 library(GISTools)
 
@@ -204,8 +197,10 @@ bls.dat <- bls.dat[, c("series_id", "year", "value",
                        "series_title", "measure_text")]
 
 # Create county name and state variables for easier identification
-bls.dat$county <- str_extract(bls.dat$series_title, 
-                              "[A-za-z.//]*\\s*[A-za-z.//]*\\s*[A-Za-z.//]*,")
+str.pattern <- "[A-za-z.//]*\\s*[A-za-z.//]*\\s*[A-Za-z.//]*,"
+
+bls.dat$county <- str_extract(bls.dat$series_title, str.pattern)
+
 bls.dat$county <- trimws(gsub(",", "", bls.dat$county))
 
 bls.dat$state <-  str_extract(bls.dat$series_title, "[A-Z]{2}")
@@ -240,7 +235,7 @@ head(airports)
 ```
 
 ## FAA Airport Traffic Data
-The FAA Airport Data consists of three Excel spreadsheets. These will be imported and combined before they are cleaned.
+The FAA Airport Data consists of four Excel spreadsheets. These will be imported and combined before they are cleaned.
 
 ```{r faaPrep}
 fname <- paste0(dat.dir, "faa/CY12AllEnplanements.xlsx")
@@ -345,8 +340,8 @@ First, in order to get an idea of what things look like, we will need to plot th
 # filter airport coordinates based on FAA codes in faa.data
 airports <- airports[airports$country == "United States",]
 
-#filter for CONUS, AK, and HI airports
-airports <- 
+#filter for CONUS, AK, and HI airports for plotting purposes-only
+airports2 <- 
   airports[(between(airports$latitude, conus.min.lat, conus.max.lat) &
            between(airports$longitude, conus.min.long, conus.max.long)) |
            (between(airports$latitude, hawaii.min.lat, hawaii.max.lat) &
@@ -357,6 +352,9 @@ airports <-
 # Prep airport coordinates
 coordinates(airports) <- c("longitude", "latitude")
 proj4string(airports) <- proj4string(county)
+
+coordinates(airports2) <- c("longitude", "latitude")
+proj4string(airports2) <- proj4string(county)
 
 # Set layout for image.
 layout(matrix(c(1,1,1,1,
@@ -369,19 +367,19 @@ layout(matrix(c(1,1,1,1,
 plot(county, xlim = conus.long.limits, ylim = conus.lat.limits,
      main = "Plot of Airports and Counties", border = "light grey",
      lwd = 0.25)
-points(airports, xlim = conus.long.limits, ylim = conus.lat.limits,
+points(airports2, xlim = conus.long.limits, ylim = conus.lat.limits,
        pch = 20, cex = 0.5)
 
 # Hawaii Plot (Plot 2)
 plot(county, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
      border = "light grey", lwd = 0.25)
-points(airports, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+points(airports2, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
        pch = 20)
 
 # Alaska Plot (Plot 3)
 plot(county, xlim = alaska.long.limits, ylim = alaska.lat.limits,
      border = "light grey", lwd = 0.25)
-points(airports, xlim = alaska.long.limits, ylim = alaska.lat.limits,
+points(airports2, xlim = alaska.long.limits, ylim = alaska.lat.limits,
        pch = 20)
 ```
 
@@ -426,13 +424,9 @@ for (apt in airports$airport.id) {
 
 Now that we have the distances calculated, we have to determine which airport is the closest.
 
-```{r distCalcMin}
+To make things easier and faster, a function will be created to calculate the minimum distance for a set of columns (the airports). Then the `apply` function will be utilized in lieu of a loop to increase computational efficiency.
 
-# set up output data for county distances
-cnty.dist <- data.frame(county = NA_character_, 
-                        dist = NA_real_, 
-                        airport.id = NA_character_,
-                        stringsAsFactors = FALSE)
+```{r distCalcMin}
 
 # This function will return the minimum distance.
 min.dist.fn <- function(temp) {
@@ -474,16 +468,59 @@ min.dist$airport.id <- gsub("airport.", "", min.dist$airport.id)
 # create final distance data set.
 cnty.dist <- cbind(counties, min.dist)
 
+cnty.dist$counties <- as.character(cnty.dist$counties)
 # look at resulting data set
 summary(cnty.dist)
 head(cnty.dist)
 ```
 
 ## Create Final Data Set
+Now that the data have been calculated and cleaned, it is time to put together the final analysis set.
+
+Since the BLS data likely has most, if not all, counties available, we will start with that dataset. Then we will join with the distance to the nearest airport, airport ID, and then the current-year traffic at that airport. 
+
+Where possible, the data will be joined by both county FIPS and year. Otherwise, the same values will be assumed for each year.
+
+```{r finalAnalysisData}
+# join BLS data and cnty.dist dat
+analysis.dat <- merge(bls, cnty.dist,
+                      by.x = "FIPS", by.y = "counties", 
+                      all.x = TRUE)
+
+# join airports with analysis.dat
+analysis.dat <- merge(analysis.dat, 
+                      airports[, c("airport.id", "iata.faa.code", "county.id")],
+                      by.x = "airport.id", by.y = "airport.id", all.x = TRUE)
+
+# join with faa data
+analysis.dat <- merge(analysis.dat, faa[, c("id", "year", "enplanements")],
+                      by.x = c("iata.faa.code", "year"),
+                      by.y = c("id", "year"), all.x = TRUE)
+
+# determine if airport located within county
+analysis.dat$airport.in.cnty <- 
+    ifelse(analysis.dat$FIPS == analysis.dat$county.id, 1, 0)
+
+
+# select and reorder remaining variables
+vars <- c("FIPS", "county", "state", "year", "UE", "min.distance", 
+          "enplanements", "airport.in.cnty")
+
+analysis.dat <- analysis.dat[, vars]
+
+# look at data
+dim(analysis.dat)
+summary(analysis.dat)
+head(analysis.dat)
+
+# show complete cases
+dim(analysis.dat[complete.cases(analysis.dat),])
+summary(analysis.dat[complete.cases(analysis.dat),])
+head(analysis.dat[complete.cases(analysis.dat),])
+
+```
 
 # Exploratory Analysis
-
-# Setting up the Model Data Set
 
 # Relationship between distance to airport and unemployment rate
 

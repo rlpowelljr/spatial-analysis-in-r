@@ -75,7 +75,6 @@ The comments after the packages explain why I am using them.
 library(openxlsx)
 
 # data cleaning
-library(tidyr)
 library(dplyr)
 library(magrittr)
 library(stringr)
@@ -86,15 +85,9 @@ library(tables)
 
 # general plotting
 library(ggplot2)
-library(gridExtra)
-
-# refine plot displays
-library(scales)
-library(RColorBrewer)
 
 # mapping
 library(sp)
-library(maps)
 library(rgdal)
 library(GISTools)
 
@@ -276,8 +269,10 @@ bls.dat <- bls.dat[, c("series_id", "year", "value",
                        "series_title", "measure_text")]
 
 # Create county name and state variables for easier identification
-bls.dat$county <- str_extract(bls.dat$series_title, 
-                              "[A-za-z.//]*\\s*[A-za-z.//]*\\s*[A-Za-z.//]*,")
+str.pattern <- "[A-za-z.//]*\\s*[A-za-z.//]*\\s*[A-Za-z.//]*,"
+
+bls.dat$county <- str_extract(bls.dat$series_title, str.pattern)
+
 bls.dat$county <- trimws(gsub(",", "", bls.dat$county))
 
 bls.dat$state <-  str_extract(bls.dat$series_title, "[A-Z]{2}")
@@ -404,7 +399,7 @@ head(airports)
 ```
 
 ## FAA Airport Traffic Data
-The FAA Airport Data consists of three Excel spreadsheets. These will be imported and combined before they are cleaned.
+The FAA Airport Data consists of four Excel spreadsheets. These will be imported and combined before they are cleaned.
 
 
 ```r
@@ -495,6 +490,8 @@ head(faa)
 
 
 ## Shapefile Import
+This first snippet of code shows how to import the Census Shapefile.
+
 
 ```r
 dsn <- "/Users/Robby/spatial-analysis-in-r/data/census/"
@@ -509,7 +506,7 @@ county <- rgdal::readOGR(dsn = dsn, layer = layer)
 ## It has 17 fields
 ```
 
-Because the United States has such a large spread of territory around the world, it is necessary to set limits for the maps. In this case, we will be using maps for the Continental U.S. (CONUS), Alaska, and Hawaii. The limits chosen for this exercise are listed below.
+Because the United States has such a large spread of territory and protectorates around the world, it is necessary to set limits for the maps. In this case, we will be using maps for the Continental U.S. (CONUS), Alaska, and Hawaii. The limits chosen for this exercise are listed below.
 
 
 ```r
@@ -559,8 +556,8 @@ First, in order to get an idea of what things look like, we will need to plot th
 # filter airport coordinates based on FAA codes in faa.data
 airports <- airports[airports$country == "United States",]
 
-#filter for CONUS, AK, and HI
-airports <- 
+#filter for CONUS, AK, and HI airports for plotting purposes-only
+airports2 <- 
   airports[(between(airports$latitude, conus.min.lat, conus.max.lat) &
            between(airports$longitude, conus.min.long, conus.max.long)) |
            (between(airports$latitude, hawaii.min.lat, hawaii.max.lat) &
@@ -572,6 +569,10 @@ airports <-
 coordinates(airports) <- c("longitude", "latitude")
 proj4string(airports) <- proj4string(county)
 
+coordinates(airports2) <- c("longitude", "latitude")
+proj4string(airports2) <- proj4string(county)
+
+# Set layout for image.
 layout(matrix(c(1,1,1,1,
                 1,1,1,1,
                 2,2,3,3,
@@ -582,19 +583,19 @@ layout(matrix(c(1,1,1,1,
 plot(county, xlim = conus.long.limits, ylim = conus.lat.limits,
      main = "Plot of Airports and Counties", border = "light grey",
      lwd = 0.25)
-points(airports, xlim = conus.long.limits, ylim = conus.lat.limits,
+points(airports2, xlim = conus.long.limits, ylim = conus.lat.limits,
        pch = 20, cex = 0.5)
 
 # Hawaii Plot (Plot 2)
 plot(county, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
      border = "light grey", lwd = 0.25)
-points(airports, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+points(airports2, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
        pch = 20)
 
 # Alaska Plot (Plot 3)
 plot(county, xlim = alaska.long.limits, ylim = alaska.lat.limits,
      border = "light grey", lwd = 0.25)
-points(airports, xlim = alaska.long.limits, ylim = alaska.lat.limits,
+points(airports2, xlim = alaska.long.limits, ylim = alaska.lat.limits,
        pch = 20)
 ```
 
@@ -604,9 +605,11 @@ This snippet of code will determine which the county within which each airport r
 
 
 ```r
+# get county ID
 airports$county.id <- 
   sp::over(airports, county)$GEOID
 
+# look at results
 head(airports)
 ```
 
@@ -648,28 +651,27 @@ apt.dist.dat <- data.frame(county.id = county$GEOID,
                            stringsAsFactors = F)
 
 # Calculate distance between each airport
+# NOTE: Consider building function instead of looping.
 for (apt in airports$airport.id) {
-  # The id is created such that the numbers will not make R think it is creating column number XXX vice just adding a new column.
+  # The id is created such that the numbers will not make R think it is
+  # creating column number XXX vice just adding a new column.
   apt.id <- paste0("airport.", apt)
   
   # get coordinates for airports and counties
   apt.coords <- coordinates(airports)[airports$airport.id == apt,]
   county.coords <- coordinates(county)
   
+  # calculate distance
   apt.dist.dat[, apt.id] <- distHaversine(apt.coords, county.coords)
 }
 ```
 
 Now that we have the distances calculated, we have to determine which airport is the closest.
 
+To make things easier and faster, a function will be created to calculate the minimum distance for a set of columns (the airports). Then the `apply` function will be utilized in lieu of a loop to increase computational efficiency.
+
 
 ```r
-# set up output data for county distances
-cnty.dist <- data.frame(county = NA_character_, 
-                        dist = NA_real_, 
-                        airport.id = NA_character_,
-                        stringsAsFactors = FALSE)
-
 # This function will return the minimum distance.
 min.dist.fn <- function(temp) {
 
@@ -692,10 +694,13 @@ counties <- apt.dist.dat$county.id
 # Get minimum distance
 min.dist <- apply(apt.dist.dat[,-1], MARGIN = 1, FUN = min.dist.fn)
 
+# transpose and convert from list
 min.dist <- t(unlist(min.dist))
 
+# create data frame
 min.dist <- data.frame(min.dist, stringsAsFactors = F)
 
+# give column names
 names(min.dist) <- c("min.distance", "airport.id")
 
 # convert min.dist to miles
@@ -704,20 +709,22 @@ min.dist$min.distance <- as.numeric(min.dist$min.distance)/1609.34
 # Get airport ID number
 min.dist$airport.id <- gsub("airport.", "", min.dist$airport.id)
 
+# create final distance data set.
 cnty.dist <- cbind(counties, min.dist)
 
+cnty.dist$counties <- as.character(cnty.dist$counties)
+# look at resulting data set
 summary(cnty.dist)
 ```
 
 ```
-##     counties     min.distance       airport.id       
-##  01001  :   1   Min.   :   0.343   Length:3233       
-##  01003  :   1   1st Qu.:  13.169   Class :character  
-##  01005  :   1   Median :  24.080   Mode  :character  
-##  01007  :   1   Mean   :  59.778                     
-##  01009  :   1   3rd Qu.:  37.098                     
-##  01011  :   1   Max.   :3507.561                     
-##  (Other):3227
+##    counties          min.distance        airport.id       
+##  Length:3233        Min.   :   0.3427   Length:3233       
+##  Class :character   1st Qu.:  13.1687   Class :character  
+##  Mode  :character   Median :  24.0599   Mode  :character  
+##                     Mean   :  57.7936                     
+##                     3rd Qu.:  37.0735                     
+##                     Max.   :2556.3075
 ```
 
 ```r
@@ -735,6 +742,142 @@ head(cnty.dist)
 ```
 
 ## Create Final Data Set
+Now that the data have been calculated and cleaned, it is time to put together the final analysis set.
+
+Since the BLS data likely has most, if not all, counties available, we will start with that dataset. Then we will join with the distance to the nearest airport, airport ID, and then the current-year traffic at that airport. 
+
+Where possible, the data will be joined by both county FIPS and year. Otherwise, the same values will be assumed for each year.
+
+
+```r
+# join BLS data and cnty.dist dat
+analysis.dat <- merge(bls, cnty.dist,
+                      by.x = "FIPS", by.y = "counties", 
+                      all.x = TRUE)
+
+# join airports with analysis.dat
+analysis.dat <- merge(analysis.dat, 
+                      airports[, c("airport.id", "iata.faa.code", "county.id")],
+                      by.x = "airport.id", by.y = "airport.id", all.x = TRUE)
+
+# join with faa data
+analysis.dat <- merge(analysis.dat, faa[, c("id", "year", "enplanements")],
+                      by.x = c("iata.faa.code", "year"),
+                      by.y = c("id", "year"), all.x = TRUE)
+
+# determine if airport located within county
+analysis.dat$airport.in.cnty <- 
+    ifelse(analysis.dat$FIPS == analysis.dat$county.id, 1, 0)
+
+
+# select and reorder remaining variables
+vars <- c("FIPS", "county", "state", "year", "UE", "min.distance", 
+          "enplanements", "airport.in.cnty")
+
+analysis.dat <- analysis.dat[, vars]
+
+# look at data
+dim(analysis.dat)
+```
+
+```
+## [1] 16135     8
+```
+
+```r
+summary(analysis.dat)
+```
+
+```
+##      FIPS              county             state                year     
+##  Length:16135       Length:16135       Length:16135       Min.   :2011  
+##  Class :character   Class :character   Class :character   1st Qu.:2012  
+##  Mode  :character   Mode  :character   Mode  :character   Median :2013  
+##                                                           Mean   :2013  
+##                                                           3rd Qu.:2014  
+##                                                           Max.   :2015  
+##                                                           NA's   :40    
+##        UE          min.distance        enplanements      airport.in.cnty 
+##  Min.   : 1.100   Min.   :   0.3427   Min.   :       0   Min.   :0.0000  
+##  1st Qu.: 5.100   1st Qu.:  13.1306   1st Qu.:     168   1st Qu.:0.0000  
+##  Median : 6.900   Median :  23.9636   Median :    6624   Median :0.0000  
+##  Mean   : 7.386   Mean   :  49.8523   Mean   :  327022   Mean   :0.2765  
+##  3rd Qu.: 9.000   3rd Qu.:  36.8046   3rd Qu.:   94044   3rd Qu.:1.0000  
+##  Max.   :28.900   Max.   :1075.4897   Max.   :49340732   Max.   :1.0000  
+##  NA's   :40       NA's   :40          NA's   :5391       NA's   :40
+```
+
+```r
+head(analysis.dat)
+```
+
+```
+##    FIPS          county state year   UE min.distance enplanements
+## 1 13151    Henry County    GA 2011 10.3     6.073055           NA
+## 2 41055  Sherman County    OR 2011 11.1    22.023565           NA
+## 3 40135 Sequoyah County    OK 2011  9.2    17.663786           NA
+## 4 55119   Taylor County    WI 2011  8.5    34.464787           NA
+## 5 55107     Rusk County    WI 2011 11.0    38.750674           NA
+## 6 55113   Sawyer County    WI 2011 11.1    37.759840           NA
+##   airport.in.cnty
+## 1               1
+## 2               0
+## 3               0
+## 4               0
+## 5               0
+## 6               0
+```
+
+```r
+# show complete cases
+dim(analysis.dat[complete.cases(analysis.dat),])
+```
+
+```
+## [1] 10744     8
+```
+
+```r
+summary(analysis.dat[complete.cases(analysis.dat),])
+```
+
+```
+##      FIPS              county             state                year     
+##  Length:10744       Length:10744       Length:10744       Min.   :2011  
+##  Class :character   Class :character   Class :character   1st Qu.:2012  
+##  Mode  :character   Mode  :character   Mode  :character   Median :2013  
+##                                                           Mean   :2013  
+##                                                           3rd Qu.:2014  
+##                                                           Max.   :2015  
+##        UE          min.distance       enplanements      airport.in.cnty 
+##  Min.   : 1.100   Min.   :  0.5124   Min.   :       0   Min.   :0.0000  
+##  1st Qu.: 4.900   1st Qu.: 14.4260   1st Qu.:     168   1st Qu.:0.0000  
+##  Median : 6.600   Median : 25.3990   Median :    6624   Median :0.0000  
+##  Mean   : 6.973   Mean   : 27.4982   Mean   :  327022   Mean   :0.2543  
+##  3rd Qu.: 8.600   3rd Qu.: 37.6483   3rd Qu.:   94044   3rd Qu.:1.0000  
+##  Max.   :28.900   Max.   :127.4185   Max.   :49340732   Max.   :1.0000
+```
+
+```r
+head(analysis.dat[complete.cases(analysis.dat),])
+```
+
+```
+##       FIPS            county state year   UE min.distance enplanements
+## 1062 01087      Macon County    AL 2013  9.7     5.212564            2
+## 1063 01123 Tallapoosa County    AL 2013  8.1    28.624586            2
+## 1064 01011    Bullock County    AL 2013  9.4    24.989976            2
+## 1109 47171     Unicoi County    TN 2013 10.5    23.085239           55
+## 1110 37199     Yancey County    NC 2013  9.5    33.520322           55
+## 1111 37189    Watauga County    NC 2013  6.4    28.304496           55
+##      airport.in.cnty
+## 1062               1
+## 1063               0
+## 1064               0
+## 1109               0
+## 1110               0
+## 1111               0
+```
 
 # Exploratory Analysis
 
@@ -764,8 +907,8 @@ sessionInfo()
 
 ```
 ## R version 3.3.1 (2016-06-21)
-## Platform: x86_64-apple-darwin15.5.0 (64-bit)
-## Running under: OS X 10.11.5 (El Capitan)
+## Platform: x86_64-apple-darwin15.6.0 (64-bit)
+## Running under: OS X 10.11.6 (El Capitan)
 ## 
 ## locale:
 ## [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
@@ -775,25 +918,24 @@ sessionInfo()
 ## 
 ## other attached packages:
 ##  [1] geosphere_1.5-5    GISTools_0.7-4     rgeos_0.3-19      
-##  [4] MASS_7.3-45        maptools_0.8-39    rgdal_1.1-10      
-##  [7] maps_3.1.0         sp_1.2-3           RColorBrewer_1.1-2
-## [10] scales_0.4.0       gridExtra_2.2.1    tables_0.7.79     
-## [13] Hmisc_3.17-4       ggplot2_2.1.0      Formula_1.2-1     
-## [16] survival_2.39-5    lattice_0.20-33    stringr_1.0.0     
-## [19] magrittr_1.5       dplyr_0.5.0        tidyr_0.5.1       
-## [22] openxlsx_3.0.0    
+##  [4] MASS_7.3-45        RColorBrewer_1.1-2 maptools_0.8-39   
+##  [7] rgdal_1.1-10       sp_1.2-3           tables_0.7.79     
+## [10] Hmisc_3.17-4       ggplot2_2.1.0      Formula_1.2-1     
+## [13] survival_2.39-5    lattice_0.20-33    stringr_1.0.0     
+## [16] magrittr_1.5       dplyr_0.5.0        openxlsx_3.0.0    
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] Rcpp_0.12.5         formatR_1.4         plyr_1.8.4         
+##  [1] Rcpp_0.12.6         formatR_1.4         plyr_1.8.4         
 ##  [4] tools_3.3.1         rpart_4.1-10        digest_0.6.9       
 ##  [7] evaluate_0.9        tibble_1.1          gtable_0.2.0       
 ## [10] Matrix_1.2-6        DBI_0.4-1           yaml_2.1.13        
-## [13] knitr_1.13          cluster_2.0.4       grid_3.3.1         
-## [16] nnet_7.3-12         data.table_1.9.6    R6_2.1.2           
-## [19] foreign_0.8-66      rmarkdown_1.0       latticeExtra_0.6-28
-## [22] htmltools_0.3.5     splines_3.3.1       assertthat_0.1     
-## [25] colorspace_1.2-6    stringi_1.1.1       acepack_1.3-3.3    
-## [28] munsell_0.4.3       chron_2.3-47
+## [13] gridExtra_2.2.1     knitr_1.13          cluster_2.0.4      
+## [16] grid_3.3.1          nnet_7.3-12         data.table_1.9.6   
+## [19] R6_2.1.2            foreign_0.8-66      rmarkdown_1.0.2    
+## [22] latticeExtra_0.6-28 scales_0.4.0        htmltools_0.3.5    
+## [25] splines_3.3.1       assertthat_0.1      colorspace_1.2-6   
+## [28] stringi_1.1.1       acepack_1.3-3.3     munsell_0.4.3      
+## [31] chron_2.3-47
 ```
 
 # Appendices
