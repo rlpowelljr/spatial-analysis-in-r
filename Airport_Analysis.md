@@ -1,6 +1,6 @@
-# Airport effects on U.S. County Unemployment Rates
+# Airport Effects on U.S. County Unemployment Rates
 Robby Powell  
-`r format(Sys.Date(), '%Y-%B-%d')`  
+2016-JUL-20  
 
 
 
@@ -21,11 +21,8 @@ The Analysis plan is delineated below.
 2. Visualize each of the main data elements by year.
 3. Visualize relationships between variables.
 4. Visualize the airport locations on a U.S. Map with County boundaries.
-5. Calculate Distances between county centroids and:
-    a. the nearest airport
-    b. the nearest airport in the Top 50 of average passenger movements
-6. Visualize the distances in two maps.
-7. Create a regression model and perform diagnostics.
+5. Calculate Distances between county centroids and the nearest airport
+6. Create a regression model and perform diagnostics.
 
 ## Data Sources
 One of the rules of the contest is that the data are available for everyone to use. In order to meet this requirement, there are links for the data and shapefile locations below. 
@@ -78,10 +75,6 @@ library(openxlsx)
 library(dplyr)
 library(magrittr)
 library(stringr)
-
-# data table display
-library(Hmisc)
-library(tables)
 
 # general plotting
 library(ggplot2)
@@ -581,20 +574,20 @@ layout(matrix(c(1,1,1,1,
 
 # CONUS Plot (Plot 1)
 plot(county, xlim = conus.long.limits, ylim = conus.lat.limits,
-     main = "Plot of Airports and Counties", border = "light grey",
+     main = "Plot of Airports and Counties", border = "grey",
      lwd = 0.25)
 points(airports2, xlim = conus.long.limits, ylim = conus.lat.limits,
        pch = 20, cex = 0.5)
 
 # Hawaii Plot (Plot 2)
 plot(county, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
-     border = "light grey", lwd = 0.25)
+     border = "grey", lwd = 0.25)
 points(airports2, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
        pch = 20)
 
 # Alaska Plot (Plot 3)
 plot(county, xlim = alaska.long.limits, ylim = alaska.lat.limits,
-     border = "light grey", lwd = 0.25)
+     border = "grey", lwd = 0.25)
 points(airports2, xlim = alaska.long.limits, ylim = alaska.lat.limits,
        pch = 20)
 ```
@@ -741,6 +734,43 @@ head(cnty.dist)
 ## 6    72085  1047.847616       7889
 ```
 
+To get a good visual of the data, here is the choropleth plot of the distance to the airport for the Fifty States.
+
+
+```r
+# Set layout for image.
+layout(matrix(c(1,1,1,1,
+                1,1,1,1,
+                2,2,3,3,
+                2,2,3,3), ncol = 4, nrow = 4, byrow = TRUE),
+       respect = TRUE)
+
+# create plot dat
+plt.dat <- cnty.dist[order(cnty.dist$counties),]
+
+# Create shading
+shading <- GISTools::auto.shading(plt.dat$min.distance, n = 5, cols = brewer.pal(5, "Blues"))
+
+# CONUS Plot (Plot 1)
+choropleth(county, plt.dat$min.distance, shading = shading,
+           xlim = conus.long.limits, ylim = conus.lat.limits,
+           main = "Plot of Min Distance to Airport", border = NA)
+# add legend
+choro.legend(px = -125, py = 31, sh = shading)
+
+# Hawaii Plot (Plot 2)
+choropleth(county, plt.dat$min.distance, shading = shading,
+     xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+     border = NA)
+
+# Alaska Plot (Plot 3)
+choropleth(county, plt.dat$min.distance, shading = shading,
+     xlim = alaska.long.limits, ylim = alaska.lat.limits,
+     border = NA)
+```
+
+![](figures/distPlot-1.png)<!-- -->
+
 ## Create Final Data Set
 Now that the data have been calculated and cleaned, it is time to put together the final analysis set.
 
@@ -881,21 +911,308 @@ head(analysis.dat[complete.cases(analysis.dat),])
 
 # Exploratory Analysis
 
-# Setting up the Model Data Set
+## Basic Data Visualization
+In the first step, we need to visualize the data.
+
+We will start by looking at Unemployment boxplots.
+
+```r
+# Unemployment Data
+ggplot(analysis.dat[!is.na(analysis.dat$year),]) +
+  aes(year, UE, group = year) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Unemployment") +
+  ggtitle("Unemployment by Year")
+```
+
+![](figures/EDA1-1.png)<!-- -->
+
+Now we will look at enplanements. 
+
+
+```r
+ggplot(analysis.dat) +
+  aes(year, enplanements, group = year) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Enplanements") +
+  ggtitle("Enplanements by Year")
+```
+
+```
+## Warning: Removed 5391 rows containing non-finite values (stat_boxplot).
+```
+
+![](figures/EDA2-1.png)<!-- -->
+
+Because there is such a variation, we will look at the boxplot where the enplanements are less than 250,000. There are 0.83293 that meet this category. 
+
+
+```r
+ggplot(analysis.dat[analysis.dat$enplanements < 250000,]) +
+  aes(year, enplanements, group = year) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Enplanements") +
+  ggtitle("Enplanements by Year")
+```
+
+```
+## Warning: Removed 5391 rows containing non-finite values (stat_boxplot).
+```
+
+![](figures/EDA3-1.png)<!-- -->
+
+Now we will look at the distance to the airport.
+
+
+```r
+ggplot(analysis.dat) +
+  aes(year, min.distance, group = year) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Minimum Distance (mi)") +
+  ggtitle("Minimum Distance to Nearest Airport by Year")
+```
+
+```
+## Warning: Removed 40 rows containing non-finite values (stat_boxplot).
+```
+
+![](figures/EDA4-1.png)<!-- -->
+
+```r
+ggplot(analysis.dat[analysis.dat$min.distance < 900,]) +
+  aes(year, min.distance, group = year) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Minimum Distance (mi)") +
+  ggtitle("Minimum Distance to Nearest Airport by Year")
+```
+
+```
+## Warning: Removed 40 rows containing non-finite values (stat_boxplot).
+```
+
+![](figures/EDA4-2.png)<!-- -->
+
+```r
+hist(analysis.dat$min.distance, 
+     main = "Histogram of Minimum Distance")
+```
+
+![](figures/EDA4-3.png)<!-- -->
+
+```r
+hist(analysis.dat$min.distance[analysis.dat$min.distance < 900],
+     main = "Histogram of Minimum Distance to Airport < 900mi")
+```
+
+![](figures/EDA4-4.png)<!-- -->
+
+## Correlations
+
+```r
+pairs(analysis.dat[c("year", "UE", "min.distance", "enplanements", 
+                     "airport.in.cnty")])
+```
+
+![](figures/EDA_pairs-1.png)<!-- -->
+
+```r
+ggplot(analysis.dat) +
+  aes(x = UE, y = log10(enplanements)) +
+  geom_point() +
+  xlab("UE") + ylab("log10(enplanements)")
+```
+
+```
+## Warning: Removed 5391 rows containing missing values (geom_point).
+```
+
+![](figures/EDA_pairs-2.png)<!-- -->
+
+```r
+ggplot(analysis.dat) +
+  aes(x = UE, y = min.distance) +
+  geom_point() +
+  xlab("UE") + ylab("min.distance")
+```
+
+```
+## Warning: Removed 40 rows containing missing values (geom_point).
+```
+
+![](figures/EDA_pairs-3.png)<!-- -->
+
+```r
+ggplot(analysis.dat) +
+  aes(x = UE, y = airport.in.cnty) +
+  geom_point() +
+  xlab("UE") + ylab("airport.in.cnty")
+```
+
+```
+## Warning: Removed 40 rows containing missing values (geom_point).
+```
+
+![](figures/EDA_pairs-4.png)<!-- -->
+
+
+```r
+cor.test(analysis.dat$UE, analysis.dat$min.distance)
+```
+
+```
+## 
+## 	Pearson's product-moment correlation
+## 
+## data:  analysis.dat$UE and analysis.dat$min.distance
+## t = 63.535, df = 16093, p-value < 2.2e-16
+## alternative hypothesis: true correlation is not equal to 0
+## 95 percent confidence interval:
+##  0.4353730 0.4600766
+## sample estimates:
+##       cor 
+## 0.4478103
+```
+
+```r
+cor.test(analysis.dat$UE, analysis.dat$enplanements)
+```
+
+```
+## 
+## 	Pearson's product-moment correlation
+## 
+## data:  analysis.dat$UE and analysis.dat$enplanements
+## t = 0.8028, df = 10742, p-value = 0.4221
+## alternative hypothesis: true correlation is not equal to 0
+## 95 percent confidence interval:
+##  -0.01116538  0.02665083
+## sample estimates:
+##         cor 
+## 0.007745495
+```
+
+## Q-Q plots
+
+
+```r
+qqnorm(analysis.dat$UE)
+qqline(analysis.dat$UE)
+```
+
+![](figures/qqplots1-1.png)<!-- -->
+
+
+```r
+qqnorm(analysis.dat$min.distance)
+qqline(analysis.dat$min.distance)
+```
+
+![](figures/qqplots2-1.png)<!-- -->
+
+
+```r
+qqnorm(analysis.dat$enplanements)
+qqline(analysis.dat$enplanements)
+```
+
+![](figures/qqplots3-1.png)<!-- -->
 
 # Relationship between distance to airport and unemployment rate
 
-## Training and Testing Datasets
+After some examination, I have chosen to model the outcome as `log(UE)`.
 
-## Training the Model
+## Creating the Model
 
-## Testing the Model
+```r
+model <- lm(log(UE) ~ min.distance + enplanements + airport.in.cnty,
+            data = analysis.dat)
+```
 
 ## Analyzing the Model
 
-# Discussion
+```r
+model
+```
+
+```
+## 
+## Call:
+## lm(formula = log(UE) ~ min.distance + enplanements + airport.in.cnty, 
+##     data = analysis.dat)
+## 
+## Coefficients:
+##     (Intercept)     min.distance     enplanements  airport.in.cnty  
+##       2.006e+00       -4.729e-03        1.335e-09       -6.165e-02
+```
+
+```r
+summary(model)
+```
+
+```
+## 
+## Call:
+## lm(formula = log(UE) ~ min.distance + enplanements + airport.in.cnty, 
+##     data = analysis.dat)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.78482 -0.27493  0.02003  0.28678  1.50819 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)      2.006e+00  1.040e-02 192.864  < 2e-16 ***
+## min.distance    -4.729e-03  2.799e-04 -16.898  < 2e-16 ***
+## enplanements     1.335e-09  2.176e-09   0.613     0.54    
+## airport.in.cnty -6.165e-02  1.097e-02  -5.618 1.97e-08 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.4044 on 10740 degrees of freedom
+##   (5391 observations deleted due to missingness)
+## Multiple R-squared:  0.02843,	Adjusted R-squared:  0.02816 
+## F-statistic: 104.8 on 3 and 10740 DF,  p-value: < 2.2e-16
+```
+
+```r
+anova(model)
+```
+
+```
+##                    Df       Sum Sq     Mean Sq    F value       Pr(>F)
+## min.distance        1 4.617032e+01 46.17031760 282.249644 1.522321e-62
+## enplanements        1 7.726835e-02  0.07726835   0.472359 4.919188e-01
+## airport.in.cnty     1 5.163685e+00  5.16368479  31.566779 1.974971e-08
+## Residuals       10740 1.756846e+03  0.16357972         NA           NA
+```
+
+```r
+layout(matrix(c(1,2,3,4),2,2))
+plot(model)
+```
+
+![](figures/model_summary-1.png)<!-- -->
+
+As you can see from the plots, the residuals are approximately normal, which is the desire of linear regression.
 
 # Conclusions
+After reviewing the model, there are three outcomes that stand out.
+
+1. Minimum Distance to an airport has a significant effect on the UE rate.
+
+2. Having an airport in the county has a significant effect on the UE rate.
+
+Both variables have a negative influence on Unemployment Rate, which means that having an airport close will slightly reduce the UE rate of the associated counties.
+
+However, it is important to note that the adjusted R^2 of the model is very low. This indicates that while significant, the significance is likely due to the number of observations in the dataset. 
+
+Overall, I would not expect airports to have a huge impact on unemployment rates. There are other variables that explain much more of the variance between Unemployment Rates.
+
+# Future Directions
+
+If I were to take this study further, I would not focus solely on airports and their relationships to counties and Unemployment. Instead, I would focus on adding in information from many other industries, and not just the aviation industry. 
+
+In addition, I would seriously consider adding in other variables such as gender, racial, and economic information related to the county populations. 
 
 # Computer Environment
 The computer used for the analysis was a Late 2013 15" MacBook Pro, with 16 GB 1600 MHz DDR3 RAM and a 2.6 GHz Intel Core i7 Processor.
@@ -919,23 +1236,17 @@ sessionInfo()
 ## other attached packages:
 ##  [1] geosphere_1.5-5    GISTools_0.7-4     rgeos_0.3-19      
 ##  [4] MASS_7.3-45        RColorBrewer_1.1-2 maptools_0.8-39   
-##  [7] rgdal_1.1-10       sp_1.2-3           tables_0.7.79     
-## [10] Hmisc_3.17-4       ggplot2_2.1.0      Formula_1.2-1     
-## [13] survival_2.39-5    lattice_0.20-33    stringr_1.0.0     
-## [16] magrittr_1.5       dplyr_0.5.0        openxlsx_3.0.0    
+##  [7] rgdal_1.1-10       sp_1.2-3           ggplot2_2.1.0     
+## [10] stringr_1.0.0      magrittr_1.5       dplyr_0.5.0       
+## [13] openxlsx_3.0.0    
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] Rcpp_0.12.6         formatR_1.4         plyr_1.8.4         
-##  [4] tools_3.3.1         rpart_4.1-10        digest_0.6.9       
-##  [7] evaluate_0.9        tibble_1.1          gtable_0.2.0       
-## [10] Matrix_1.2-6        DBI_0.4-1           yaml_2.1.13        
-## [13] gridExtra_2.2.1     knitr_1.13          cluster_2.0.4      
-## [16] grid_3.3.1          nnet_7.3-12         data.table_1.9.6   
-## [19] R6_2.1.2            foreign_0.8-66      rmarkdown_1.0.2    
-## [22] latticeExtra_0.6-28 scales_0.4.0        htmltools_0.3.5    
-## [25] splines_3.3.1       assertthat_0.1      colorspace_1.2-6   
-## [28] stringi_1.1.1       acepack_1.3-3.3     munsell_0.4.3      
-## [31] chron_2.3-47
+##  [1] Rcpp_0.12.6      knitr_1.13       munsell_0.4.3    colorspace_1.2-6
+##  [5] lattice_0.20-33  R6_2.1.2         plyr_1.8.4       tools_3.3.1     
+##  [9] grid_3.3.1       gtable_0.2.0     DBI_0.4-1        htmltools_0.3.5 
+## [13] yaml_2.1.13      assertthat_0.1   digest_0.6.9     tibble_1.1      
+## [17] formatR_1.4      evaluate_0.9     rmarkdown_1.0.2  labeling_0.3    
+## [21] stringi_1.1.1    scales_0.4.0     foreign_0.8-66
 ```
 
 # Appendices
@@ -944,9 +1255,505 @@ This section will show the full code of the analysis scripts.
 ## Appendix A: Complete Analysis
 
 ```r
-# PLACE HOLDER FOR CODE HERE
+## ----setup, include=FALSE------------------------------------------------
+knitr::opts_chunk$set(fig.width = 9, fig.height = 9, fig.path = "figures/")
 
-# NEED TO SPIN RMD DOCUMENT AND DELETE APPENDIX CODE BEFORE PASTING
+## ----directorySetup------------------------------------------------------
+# Main directory
+main.dir <- "~/spatial-analysis-in-r/"
+
+# Script directory
+script.dir <- paste0(main.dir, "scripts/")
+
+# data directory
+dat.dir <- paste0(main.dir, "data/")
+
+## ----loadPackages, warning = FALSE, error = FALSE, message = FALSE-------
+# data import
+library(openxlsx)
+
+# data cleaning
+library(dplyr)
+library(magrittr)
+library(stringr)
+
+# general plotting
+library(ggplot2)
+
+# mapping
+library(sp)
+library(rgdal)
+library(GISTools)
+
+# distance calculation
+library(geosphere)
+
+## ----blsDataPrep1--------------------------------------------------------
+# Import UE Data
+fname <- paste0(dat.dir, "/bls/la.data.64.County")
+bls.dat <- read.delim(fname, header = TRUE, stringsAsFactors = FALSE, 
+                      sep = "\t")
+
+# trim white space in series_id
+bls.dat$series_id <- trimws(bls.dat$series_id)
+
+# change value to numeric
+bls.dat$value <- as.numeric(bls.dat$value)
+
+head(bls.dat)
+
+## ----blsDataPrep2--------------------------------------------------------
+# Import la.measure
+fname <- paste0(dat.dir, "/bls/la.measure")
+bls.measure <- read.delim(fname, header = TRUE, stringsAsFactors = FALSE, 
+                      sep = "\t")
+
+## ----blsDataPrep3--------------------------------------------------------
+# fix variables
+bls.measure$measure_text <- bls.measure$measure_code
+bls.measure$measure_code <- as.numeric(rownames(bls.measure))
+
+bls.measure
+
+## ----blsDataPrep4--------------------------------------------------------
+# la.period
+fname <- paste0(dat.dir, "/bls/la.period")
+bls.period <- read.delim(fname, header = TRUE, stringsAsFactors = FALSE, 
+                      sep = "\t")
+
+bls.period
+
+## ----blsDataPrep6--------------------------------------------------------
+# la.period
+fname <- paste0(dat.dir, "/bls/la.series")
+bls.series <- read.table(fname, header = TRUE, stringsAsFactors = FALSE, 
+                      sep = "\t")
+
+# trim white space from series_id
+bls.series$series_id <- trimws(bls.series$series_id)
+
+head(bls.series)
+
+## ----blsDataPrep7--------------------------------------------------------
+# filter for period M13
+bls.dat <- bls.dat[bls.dat$period == "M13",]
+
+# filter for year
+bls.dat <- bls.dat[bls.dat$year %in% c(2011:2015),]
+ 
+# Join data together via a left join.
+bls.dat <- merge(bls.dat, bls.series,
+                 by.x = "series_id", by.y = "series_id",
+                 all.x = TRUE)
+
+bls.dat <- merge(bls.dat, bls.measure,
+                 by.x = "measure_code", by.y = "measure_code", all.x = TRUE)
+
+# filter for unemployment rate
+bls.dat <- bls.dat[bls.dat$measure_text == "unemployment rate", ]
+
+# reduce dataset
+bls.dat <- bls.dat[, c("series_id", "year", "value", 
+                       "series_title", "measure_text")]
+
+# Create county name and state variables for easier identification
+str.pattern <- "[A-za-z.//]*\\s*[A-za-z.//]*\\s*[A-Za-z.//]*,"
+
+bls.dat$county <- str_extract(bls.dat$series_title, str.pattern)
+
+bls.dat$county <- trimws(gsub(",", "", bls.dat$county))
+
+bls.dat$state <-  str_extract(bls.dat$series_title, "[A-Z]{2}")
+
+# Extract FIPS Code
+bls.dat$FIPS <- substr(bls.dat$series_id, 6, 10)
+
+# Select columns
+bls <- bls.dat[c("FIPS", "county", "state", "year", "value")]
+
+# Change names
+names(bls) <- c("FIPS", "county", "state", "year", "UE")
+
+## ----blsDataPrep8--------------------------------------------------------
+head(bls)
+summary(bls)
+
+## ----airportPrep---------------------------------------------------------
+fname <- paste0(dat.dir, "airports/airports.dat.txt")
+airports <- read.csv(fname, header = TRUE, stringsAsFactors = FALSE)
+
+summary(airports)
+head(airports)
+
+## ----faaPrep-------------------------------------------------------------
+fname <- paste0(dat.dir, "faa/CY12AllEnplanements.xlsx")
+faa.cy12 <- openxlsx::read.xlsx(fname)
+
+fname <- paste0(dat.dir, "faa/cy13-all-enplanements.xlsx")
+faa.cy13 <- openxlsx::read.xlsx(fname)
+
+fname <- paste0(dat.dir, "faa/CY14-all-enplanements.xlsx")
+faa.cy14 <- openxlsx::read.xlsx(fname, sheet = "data")
+
+fname <- paste0(dat.dir, "faa/preliminary-cy15-all-enplanements.xlsx")
+faa.cy15 <- openxlsx::read.xlsx(fname)
+
+# Select Annual Data, Rename columns, and add year.
+faa.cy11 <- faa.cy12[, c("ST", "Locid", "City", "Airport.Name", 
+                         "CY.11.Enplanements")]
+names(faa.cy11) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy11$year <- 2011
+
+faa.cy12 <- faa.cy12[, c("ST", "Locid", "City", "Airport.Name", 
+                         "CY.12.Enplanements")]
+names(faa.cy12) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy12$year <- 2012
+
+faa.cy13 <- faa.cy13[, c("ST", "Locid", "City", "Airport.Name",
+                         "CY.13.Enplanements")]
+names(faa.cy13) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy13$year <- 2013
+
+faa.cy14 <- faa.cy14[, c("ST", "Locid", "City", "Airport.Name",
+                         "CY.14.Enplanements")]
+names(faa.cy14) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy14$year <- 2014
+
+faa.cy15 <- faa.cy15[, c("ST", "Locid", "City", "Airport.Name",
+                         "CY.15.Enplanements")]
+names(faa.cy15) <- c("state", "id", "city", "airport.name", "enplanements")
+faa.cy15$year <- 2015
+
+# Combine
+faa <- rbind(faa.cy11, faa.cy12, faa.cy13, faa.cy14, faa.cy15)
+
+summary(faa)
+head(faa)
+
+## ----shapefileImport-----------------------------------------------------
+dsn <- "/Users/Robby/spatial-analysis-in-r/data/census/"
+layer <- "tl_2015_us_county"
+county <- rgdal::readOGR(dsn = dsn, layer = layer)
+
+## ----plotLimitsCONUS-----------------------------------------------------
+# Continental US (CONUS)
+conus.min.lat <- 25
+conus.max.lat <- 50
+conus.min.long <- -126
+conus.max.long <- -65
+
+conus.long.limits <- c(conus.min.long, conus.max.long)
+conus.lat.limits <- c(conus.min.lat, conus.max.lat)
+
+## ----plotLimitsHawaii----------------------------------------------------
+# Hawaii
+hawaii.min.lat <- 18
+hawaii.max.lat <- 23
+hawaii.min.long <- -161 
+hawaii.max.long <- -154
+
+hawaii.long.limits <- c(hawaii.min.long, hawaii.max.long)
+hawaii.lat.limits <- c(hawaii.min.lat, hawaii.max.lat)
+
+## ----plotLimitsAlaska----------------------------------------------------
+# Alaska
+alaska.min.lat <- 52
+alaska.max.lat <- 72
+alaska.min.long <- -177
+alaska.max.long <- -129
+
+alaska.long.limits <- c(alaska.min.long, alaska.max.long)
+alaska.lat.limits <- c(alaska.min.lat, alaska.max.lat)
+
+## ----countyAirportIdentification1----------------------------------------
+# filter airport coordinates based on FAA codes in faa.data
+airports <- airports[airports$country == "United States",]
+
+#filter for CONUS, AK, and HI airports for plotting purposes-only
+airports2 <- 
+  airports[(between(airports$latitude, conus.min.lat, conus.max.lat) &
+           between(airports$longitude, conus.min.long, conus.max.long)) |
+           (between(airports$latitude, hawaii.min.lat, hawaii.max.lat) &
+           between(airports$longitude, hawaii.min.long, hawaii.max.long)) |
+           (between(airports$latitude, alaska.min.lat, alaska.max.lat) &
+           between(airports$longitude, alaska.min.long, alaska.max.long)),]
+
+# Prep airport coordinates
+coordinates(airports) <- c("longitude", "latitude")
+proj4string(airports) <- proj4string(county)
+
+coordinates(airports2) <- c("longitude", "latitude")
+proj4string(airports2) <- proj4string(county)
+
+# Set layout for image.
+layout(matrix(c(1,1,1,1,
+                1,1,1,1,
+                2,2,3,3,
+                2,2,3,3), ncol = 4, nrow = 4, byrow = TRUE),
+       respect = TRUE)
+
+# CONUS Plot (Plot 1)
+plot(county, xlim = conus.long.limits, ylim = conus.lat.limits,
+     main = "Plot of Airports and Counties", border = "grey",
+     lwd = 0.25)
+points(airports2, xlim = conus.long.limits, ylim = conus.lat.limits,
+       pch = 20, cex = 0.5)
+
+# Hawaii Plot (Plot 2)
+plot(county, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+     border = "grey", lwd = 0.25)
+points(airports2, xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+       pch = 20)
+
+# Alaska Plot (Plot 3)
+plot(county, xlim = alaska.long.limits, ylim = alaska.lat.limits,
+     border = "grey", lwd = 0.25)
+points(airports2, xlim = alaska.long.limits, ylim = alaska.lat.limits,
+       pch = 20)
+
+## ----countyAirportIdentification2----------------------------------------
+# get county ID
+airports$county.id <- 
+  sp::over(airports, county)$GEOID
+
+# look at results
+head(airports)
+
+## ----distCalc------------------------------------------------------------
+# Set up output data frame
+apt.dist.dat <- data.frame(county.id = county$GEOID,
+                           stringsAsFactors = F)
+
+# Calculate distance between each airport
+# NOTE: Consider building function instead of looping.
+for (apt in airports$airport.id) {
+  # The id is created such that the numbers will not make R think it is
+  # creating column number XXX vice just adding a new column.
+  apt.id <- paste0("airport.", apt)
+  
+  # get coordinates for airports and counties
+  apt.coords <- coordinates(airports)[airports$airport.id == apt,]
+  county.coords <- coordinates(county)
+  
+  # calculate distance
+  apt.dist.dat[, apt.id] <- distHaversine(apt.coords, county.coords)
+}
+
+## ----distCalcMin---------------------------------------------------------
+
+# This function will return the minimum distance.
+min.dist.fn <- function(temp) {
+
+  # Select airport with smallest distance
+  min.index <- which.min(temp)
+  
+  # Return distance
+  min.dist <- temp[min.index]
+  
+  # Get airport ID
+  apt.id <- names(temp)[min.index]
+  
+  # output data
+  out <- cbind(min.dist, apt.id)
+  return(out)
+}
+
+# Get counties
+counties <- apt.dist.dat$county.id
+# Get minimum distance
+min.dist <- apply(apt.dist.dat[,-1], MARGIN = 1, FUN = min.dist.fn)
+
+# transpose and convert from list
+min.dist <- t(unlist(min.dist))
+
+# create data frame
+min.dist <- data.frame(min.dist, stringsAsFactors = F)
+
+# give column names
+names(min.dist) <- c("min.distance", "airport.id")
+
+# convert min.dist to miles
+min.dist$min.distance <- as.numeric(min.dist$min.distance)/1609.34
+
+# Get airport ID number
+min.dist$airport.id <- gsub("airport.", "", min.dist$airport.id)
+
+# create final distance data set.
+cnty.dist <- cbind(counties, min.dist)
+
+cnty.dist$counties <- as.character(cnty.dist$counties)
+# look at resulting data set
+summary(cnty.dist)
+head(cnty.dist)
+
+## ----distPlot------------------------------------------------------------
+# Set layout for image.
+layout(matrix(c(1,1,1,1,
+                1,1,1,1,
+                2,2,3,3,
+                2,2,3,3), ncol = 4, nrow = 4, byrow = TRUE),
+       respect = TRUE)
+
+# create plot dat
+plt.dat <- cnty.dist[order(cnty.dist$counties),]
+
+# Create shading
+shading <- GISTools::auto.shading(plt.dat$min.distance, n = 5, cols = brewer.pal(5, "Blues"))
+
+# CONUS Plot (Plot 1)
+choropleth(county, plt.dat$min.distance, shading = shading,
+           xlim = conus.long.limits, ylim = conus.lat.limits,
+           main = "Plot of Min Distance to Airport", border = NA)
+# add legend
+choro.legend(px = -125, py = 31, sh = shading)
+
+# Hawaii Plot (Plot 2)
+choropleth(county, plt.dat$min.distance, shading = shading,
+     xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+     border = NA)
+
+# Alaska Plot (Plot 3)
+choropleth(county, plt.dat$min.distance, shading = shading,
+     xlim = alaska.long.limits, ylim = alaska.lat.limits,
+     border = NA)
+
+
+## ----finalAnalysisData---------------------------------------------------
+# join BLS data and cnty.dist dat
+analysis.dat <- merge(bls, cnty.dist,
+                      by.x = "FIPS", by.y = "counties", 
+                      all.x = TRUE)
+
+# join airports with analysis.dat
+analysis.dat <- merge(analysis.dat, 
+                      airports[, c("airport.id", "iata.faa.code", "county.id")],
+                      by.x = "airport.id", by.y = "airport.id", all.x = TRUE)
+
+# join with faa data
+analysis.dat <- merge(analysis.dat, faa[, c("id", "year", "enplanements")],
+                      by.x = c("iata.faa.code", "year"),
+                      by.y = c("id", "year"), all.x = TRUE)
+
+# determine if airport located within county
+analysis.dat$airport.in.cnty <- 
+    ifelse(analysis.dat$FIPS == analysis.dat$county.id, 1, 0)
+
+
+# select and reorder remaining variables
+vars <- c("FIPS", "county", "state", "year", "UE", "min.distance", 
+          "enplanements", "airport.in.cnty")
+
+analysis.dat <- analysis.dat[, vars]
+
+# look at data
+dim(analysis.dat)
+summary(analysis.dat)
+head(analysis.dat)
+
+# show complete cases
+dim(analysis.dat[complete.cases(analysis.dat),])
+summary(analysis.dat[complete.cases(analysis.dat),])
+head(analysis.dat[complete.cases(analysis.dat),])
+
+
+## ----EDA1----------------------------------------------------------------
+# Unemployment Data
+ggplot(analysis.dat[!is.na(analysis.dat$year),]) +
+  aes(year, UE, group = year) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Unemployment") +
+  ggtitle("Unemployment by Year")
+
+## ----EDA2----------------------------------------------------------------
+
+ggplot(analysis.dat) +
+  aes(year, enplanements, group = year) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Enplanements") +
+  ggtitle("Enplanements by Year")
+
+## ----EDA3----------------------------------------------------------------
+ggplot(analysis.dat[analysis.dat$enplanements < 250000,]) +
+  aes(year, enplanements, group = year) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Enplanements") +
+  ggtitle("Enplanements by Year")
+
+
+## ----EDA4----------------------------------------------------------------
+ggplot(analysis.dat) +
+  aes(year, min.distance, group = year) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Minimum Distance (mi)") +
+  ggtitle("Minimum Distance to Nearest Airport by Year")
+
+ggplot(analysis.dat[analysis.dat$min.distance < 900,]) +
+  aes(year, min.distance, group = year) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Minimum Distance (mi)") +
+  ggtitle("Minimum Distance to Nearest Airport by Year")
+
+hist(analysis.dat$min.distance, 
+     main = "Histogram of Minimum Distance")
+
+hist(analysis.dat$min.distance[analysis.dat$min.distance < 900],
+     main = "Histogram of Minimum Distance to Airport < 900mi")
+
+
+## ----EDA_pairs-----------------------------------------------------------
+pairs(analysis.dat[c("year", "UE", "min.distance", "enplanements", 
+                     "airport.in.cnty")])
+
+ggplot(analysis.dat) +
+  aes(x = UE, y = log10(enplanements)) +
+  geom_point() +
+  xlab("UE") + ylab("log10(enplanements)")
+
+ggplot(analysis.dat) +
+  aes(x = UE, y = min.distance) +
+  geom_point() +
+  xlab("UE") + ylab("min.distance")
+  
+ggplot(analysis.dat) +
+  aes(x = UE, y = airport.in.cnty) +
+  geom_point() +
+  xlab("UE") + ylab("airport.in.cnty")
+
+
+## ----EDA_corrs-----------------------------------------------------------
+cor.test(analysis.dat$UE, analysis.dat$min.distance)
+
+cor.test(analysis.dat$UE, analysis.dat$enplanements)
+
+
+## ----qqplots1------------------------------------------------------------
+qqnorm(analysis.dat$UE)
+qqline(analysis.dat$UE)
+
+## ----qqplots2------------------------------------------------------------
+qqnorm(analysis.dat$min.distance)
+qqline(analysis.dat$min.distance)
+
+## ----qqplots3------------------------------------------------------------
+qqnorm(analysis.dat$enplanements)
+qqline(analysis.dat$enplanements)
+
+## ----model---------------------------------------------------------------
+
+model <- lm(log(UE) ~ min.distance + enplanements + airport.in.cnty,
+            data = analysis.dat)
+
+
+## ----model_summary-------------------------------------------------------
+model
+summary(model)
+anova(model)
+
+layout(matrix(c(1,2,3,4),2,2))
+plot(model)
+
+## ----computerInfo--------------------------------------------------------
+sessionInfo()
 ```
 
 ## Appendix B: Airport Location from openflight.org
