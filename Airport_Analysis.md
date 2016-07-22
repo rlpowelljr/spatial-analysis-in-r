@@ -654,7 +654,7 @@ choropleth(county, plt.dat$UE, shading = shades,
            xlim = conus.long.limits, ylim = conus.lat.limits,
            main = "2015 County Unemployment Rates", border = NA)
 # add legend
-choro.legend(px = -125, py = 31, sh = shades)
+choro.legend(px = -125, py = 32, sh = shades)
 
 # Hawaii Plot (Plot 2)
 choropleth(county, plt.dat$UE, shading = shades,
@@ -669,12 +669,12 @@ choropleth(county, plt.dat$UE, shading = shades,
 
 ![](figures/unemploymentPlot-1.png)<!-- -->
 
-This plot shows definite patterns Unemployment across the nation. In particular, the area around the Dakotas has some of the lowest UE rates in the nation. 
+This plot shows some clusters where unemployment rates are similar. 
 
 ## Calculate County Distance to the Nearest Airport
 Now, it is time to calculate the distance of the county centroids to their nearest airport. In order to determine this quantity, we will utilize the Great Circle Formula, or, more specifically, the Haversine Formula to calculate the distances.
 
-Thankfully, we do not have to create this formula from scratch. It is located in the `geosphere` package, which is available on CRAN. The results will be in meters. 
+Thankfully, we do not have to create this formula from scratch. It is located in the `geosphere` package, which is available on CRAN. The results from this formula will be in meters. 
 
 Due to the way the output is being used, there is no need to change units; however, because distance is easier for most to understand in miles, we will convert the resulting distances to miles after we have determined the minimum distance for the airports.
 
@@ -971,6 +971,8 @@ ggplot(analysis.dat[!is.na(analysis.dat$year),]) +
 
 ![](figures/EDA1-1.png)<!-- -->
 
+There is an obvious decline in unemployment over the past five years. In addition, there seems to be a regression to the mean for the unemployment rates, which reduces the variation in rates across the counties.
+
 Now we will look at enplanements. 
 
 
@@ -988,7 +990,7 @@ ggplot(analysis.dat) +
 
 ![](figures/EDA2-1.png)<!-- -->
 
-Because there is such a variation, we will look at the boxplot where the enplanements are less than 250,000. There are 0.83293 that meet this category. 
+This set of boxplots demonstrates a wide range of data for enplanements. Because there is such a variation, we will look at the boxplot where the enplanements are less than 250,000. There are 0.83293 that meet this category. 
 
 
 ```r
@@ -1004,6 +1006,8 @@ ggplot(analysis.dat[analysis.dat$enplanements < 250000,]) +
 ```
 
 ![](figures/EDA3-1.png)<!-- -->
+
+Based on a quick examination, it looks like the median number of emplanements has changed slightly, though this is not necessarily statistically significant. Similarly, the variation seems to have changed throughout the past five years.
 
 Now we will look at the distance to the airport.
 
@@ -1049,6 +1053,10 @@ hist(analysis.dat$min.distance[analysis.dat$min.distance < 900],
 ```
 
 ![](figures/EDA4-4.png)<!-- -->
+
+Based on visualization, this data actually seems to follow a pseudo-Poisson distribution. 
+
+If one thinks about the geography, this makes sense. After all, there tends to be more counties in areas of high population density. Similarly, airports will likely follow population centers to some degree in order to connect them together.
 
 ## Correlations
 
@@ -1135,6 +1143,8 @@ cor.test(analysis.dat$UE, analysis.dat$enplanements)
 ## 0.007745495
 ```
 
+Based on the correlation tests, there seems to be a moderate relationship between UE and the minimum distance to the airport. The number of emplanements does not seem to be related, though that may be driven in part by the tens of high-volume airports throughout the nation.
+
 ## Q-Q plots
 
 
@@ -1161,9 +1171,11 @@ qqline(analysis.dat$enplanements)
 
 ![](figures/qqplots3-1.png)<!-- -->
 
+If we were worried about normality in the variables, then we would need to consider all three of these variables since they have significant departures from normality.
+
 # Relationship between distance to airport and unemployment rate
 
-After some examination, I have chosen to model the outcome as `log(UE)`.
+After some examination, I have chosen to model the outcome as `log(UE)`, which gives relatively-normal residuals.
 
 ## Creating the Model
 
@@ -1250,11 +1262,15 @@ Both variables have a negative influence on Unemployment Rate, which means that 
 
 However, it is important to note that the adjusted $R^2$ of the model is very low. This indicates that while significant, the significance is likely due to the number of observations in the dataset. 
 
-Overall, I would not expect airports to have a huge impact on unemployment rates. There are other variables that explain much more of the variance.
+Overall, I would not expect airports to have a huge impact on unemployment rates. There are other variables that explain more of the variance.
 
 # Future Directions
 
-If I were to take this study further, I would not focus solely on airports and their relationships to counties and Unemployment. Instead, I would focus on adding in information from many other industries, and not just the aviation industry. 
+If one wanted to continue to examine airports, I would consider adding in variables to denote how many airports are located within a county, as well as the volume of those airports. At one point, I would consider looking at the distance between the nearest low-volume airport, the nearest medium-volume airport, and the nearest high-volume airport. Making these distinctions could provide a better result.
+
+However, I would not focus solely on airports and their relationships to counties and Unemployment. Instead, I would focus on adding in information from many other industries. There may be other industries that provide a much better indicator of Unemployment rates. 
+
+Two of these may be food-service and retail industries, which tend to be affected by changes in employment patterns.
 
 In addition, I would seriously consider adding in other variables such as gender, racial, and economic information related to the county populations. 
 
@@ -1557,8 +1573,44 @@ points(airports2, xlim = alaska.long.limits, ylim = alaska.lat.limits,
 airports$county.id <- 
   sp::over(airports, county)$GEOID
 
+## ----unemploymentPlot----------------------------------------------------
 # look at results
 head(airports)
+
+
+# Set layout for image.
+layout(matrix(c(1,1,1,1,
+                1,1,1,1,
+                2,2,3,3,
+                2,2,3,3), ncol = 4, nrow = 4, byrow = TRUE),
+       respect = TRUE)
+
+# create plot dat
+plt.dat <- merge(county[, "GEOID"], 
+                 bls[bls$year == 2015, c("FIPS", "UE")],
+                 by.x = "GEOID", by.y = "FIPS",
+                 all.x = TRUE)
+plt.dat <- plt.dat[order(plt.dat$GEOID),]
+
+# Create shading
+shades <- GISTools::shading(breaks = c(4,6,8,10,12), cols = brewer.pal(6, "Blues"))
+
+# CONUS Plot (Plot 1)
+choropleth(county, plt.dat$UE, shading = shades,
+           xlim = conus.long.limits, ylim = conus.lat.limits,
+           main = "2015 County Unemployment Rates", border = NA)
+# add legend
+choro.legend(px = -125, py = 32, sh = shades)
+
+# Hawaii Plot (Plot 2)
+choropleth(county, plt.dat$UE, shading = shades,
+     xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+     border = NA)
+
+# Alaska Plot (Plot 3)
+choropleth(county, plt.dat$UE, shading = shades,
+     xlim = alaska.long.limits, ylim = alaska.lat.limits,
+     border = NA)
 
 ## ----distCalc------------------------------------------------------------
 # Set up output data frame

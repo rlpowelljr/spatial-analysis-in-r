@@ -1025,8 +1025,44 @@ points(airports2, xlim = alaska.long.limits, ylim = alaska.lat.limits,
 airports$county.id <- 
   sp::over(airports, county)$GEOID
 
+## ----unemploymentPlot----------------------------------------------------
 # look at results
 head(airports)
+
+
+# Set layout for image.
+layout(matrix(c(1,1,1,1,
+                1,1,1,1,
+                2,2,3,3,
+                2,2,3,3), ncol = 4, nrow = 4, byrow = TRUE),
+       respect = TRUE)
+
+# create plot dat
+plt.dat <- merge(county[, "GEOID"], 
+                 bls[bls$year == 2015, c("FIPS", "UE")],
+                 by.x = "GEOID", by.y = "FIPS",
+                 all.x = TRUE)
+plt.dat <- plt.dat[order(plt.dat$GEOID),]
+
+# Create shading
+shades <- GISTools::shading(breaks = c(4,6,8,10,12), cols = brewer.pal(6, "Blues"))
+
+# CONUS Plot (Plot 1)
+choropleth(county, plt.dat$UE, shading = shades,
+           xlim = conus.long.limits, ylim = conus.lat.limits,
+           main = "2015 County Unemployment Rates", border = NA)
+# add legend
+choro.legend(px = -125, py = 32, sh = shades)
+
+# Hawaii Plot (Plot 2)
+choropleth(county, plt.dat$UE, shading = shades,
+     xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+     border = NA)
+
+# Alaska Plot (Plot 3)
+choropleth(county, plt.dat$UE, shading = shades,
+     xlim = alaska.long.limits, ylim = alaska.lat.limits,
+     border = NA)
 
 ## ----distCalc------------------------------------------------------------
 # Set up output data frame
