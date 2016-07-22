@@ -1,6 +1,6 @@
 # Airport Effects on U.S. County Unemployment Rates
 Robby Powell  
-2016-JUL-20  
+2016-JUL-21  
 
 
 
@@ -53,9 +53,6 @@ If you change directories, then all you need to do is to alter the `main.dir` va
 # Main directory
 main.dir <- "~/spatial-analysis-in-r/"
 
-# Script directory
-script.dir <- paste0(main.dir, "scripts/")
-
 # data directory
 dat.dir <- paste0(main.dir, "data/")
 ```
@@ -63,8 +60,6 @@ dat.dir <- paste0(main.dir, "data/")
 ## Package setup
 
 The packages utilized in this analysis are below. Unless otherwise noted, they are available from CRAN.
-
-The comments after the packages explain why I am using them.
 
 
 ```r
@@ -92,7 +87,7 @@ library(geosphere)
 In this section, I will import and clean the data.
 
 ## BLS Data
-First, I will import the main data set, which is labeled `la.data.64.County`. This contains all of the unemployment numbers.
+First, I will import the main data set, which is labeled `la.data.64.County`. This contains all of the unemployment numbers, not just the unemployment rate.
 
 
 ```r
@@ -128,7 +123,7 @@ head(bls.dat)
 
 Upon examination, the missing values are for the years 2005 and 2006, which means that they are not of interest to this analysis.
 
-After getting the basic preparation for the main dataset, it is time to import the crosswalks for easier identification.
+After getting the basic preparation for the main dataset, it is time to import the crosswalks for easier identification. These are also provided by the BLS.
 
 
 ```r
@@ -392,7 +387,9 @@ head(airports)
 ```
 
 ## FAA Airport Traffic Data
-The FAA Airport Data consists of four Excel spreadsheets. These will be imported and combined before they are cleaned.
+The FAA Airport Data consists of four Excel spreadsheets. These will be imported and cleaned before they are combined.
+
+It is important to note that the spreadsheets each contain two years' worth of data, as they show the percent change.
 
 
 ```r
@@ -481,9 +478,8 @@ head(faa)
 ```
 
 
-
 ## Shapefile Import
-This first snippet of code shows how to import the Census Shapefile.
+This first snippet of code shows how to import the Census Shapefile. Please take note of the specific definition of the dsn. During previous work, I found that the approximate location utilizing the `~/` method causes an error.
 
 
 ```r
@@ -630,6 +626,51 @@ head(airports)
 ## 1618         -8   A America/Los_Angeles     41059
 ```
 
+## BLS Plot
+
+Now that we have both the BLS data and the shapefiles imported and prepared, we will take a look at the distribution of the 2015 County Unemployment Rates across the nation.
+
+
+```r
+# Set layout for image.
+layout(matrix(c(1,1,1,1,
+                1,1,1,1,
+                2,2,3,3,
+                2,2,3,3), ncol = 4, nrow = 4, byrow = TRUE),
+       respect = TRUE)
+
+# create plot dat
+plt.dat <- merge(county[, "GEOID"], 
+                 bls[bls$year == 2015, c("FIPS", "UE")],
+                 by.x = "GEOID", by.y = "FIPS",
+                 all.x = TRUE)
+plt.dat <- plt.dat[order(plt.dat$GEOID),]
+
+# Create shading
+shades <- GISTools::shading(breaks = c(4,6,8,10,12), cols = brewer.pal(6, "Blues"))
+
+# CONUS Plot (Plot 1)
+choropleth(county, plt.dat$UE, shading = shades,
+           xlim = conus.long.limits, ylim = conus.lat.limits,
+           main = "2015 County Unemployment Rates", border = NA)
+# add legend
+choro.legend(px = -125, py = 31, sh = shades)
+
+# Hawaii Plot (Plot 2)
+choropleth(county, plt.dat$UE, shading = shades,
+     xlim = hawaii.long.limits, ylim = hawaii.lat.limits,
+     border = NA)
+
+# Alaska Plot (Plot 3)
+choropleth(county, plt.dat$UE, shading = shades,
+     xlim = alaska.long.limits, ylim = alaska.lat.limits,
+     border = NA)
+```
+
+![](figures/unemploymentPlot-1.png)<!-- -->
+
+This plot shows definite patterns Unemployment across the nation. In particular, the area around the Dakotas has some of the lowest UE rates in the nation. 
+
 ## Calculate County Distance to the Nearest Airport
 Now, it is time to calculate the distance of the county centroids to their nearest airport. In order to determine this quantity, we will utilize the Great Circle Formula, or, more specifically, the Haversine Formula to calculate the distances.
 
@@ -644,7 +685,6 @@ apt.dist.dat <- data.frame(county.id = county$GEOID,
                            stringsAsFactors = F)
 
 # Calculate distance between each airport
-# NOTE: Consider building function instead of looping.
 for (apt in airports$airport.id) {
   # The id is created such that the numbers will not make R think it is
   # creating column number XXX vice just adding a new column.
@@ -770,6 +810,10 @@ choropleth(county, plt.dat$min.distance, shading = shading,
 ```
 
 ![](figures/distPlot-1.png)<!-- -->
+
+This map is interesting in that it seems to be randomly distributed across the country, and there are no discernable patterns.
+
+Based on a visual comparison to the latest unemployment rate data, it looks like there may not be a relationship between Uemployment and distance to the nearest airport.
 
 ## Create Final Data Set
 Now that the data have been calculated and cleaned, it is time to put together the final analysis set.
@@ -1204,9 +1248,9 @@ After reviewing the model, there are three outcomes that stand out.
 
 Both variables have a negative influence on Unemployment Rate, which means that having an airport close will slightly reduce the UE rate of the associated counties.
 
-However, it is important to note that the adjusted R^2 of the model is very low. This indicates that while significant, the significance is likely due to the number of observations in the dataset. 
+However, it is important to note that the adjusted $R^2$ of the model is very low. This indicates that while significant, the significance is likely due to the number of observations in the dataset. 
 
-Overall, I would not expect airports to have a huge impact on unemployment rates. There are other variables that explain much more of the variance between Unemployment Rates.
+Overall, I would not expect airports to have a huge impact on unemployment rates. There are other variables that explain much more of the variance.
 
 # Future Directions
 
@@ -1261,9 +1305,6 @@ knitr::opts_chunk$set(fig.width = 9, fig.height = 9, fig.path = "figures/")
 ## ----directorySetup------------------------------------------------------
 # Main directory
 main.dir <- "~/spatial-analysis-in-r/"
-
-# Script directory
-script.dir <- paste0(main.dir, "scripts/")
 
 # data directory
 dat.dir <- paste0(main.dir, "data/")
